@@ -192,9 +192,9 @@ def train(args):
         torch.cuda.manual_seed(0)
     
     if args.task == "completion":
-        augmentation_combos = list(itertools.product([0, 0], REMOVAL_AMOUNTS))
+        augmentation_combos = list(set(itertools.product([0, 0], REMOVAL_AMOUNTS)))
     elif args.task == "denoising":
-        augmentation_combos = list(itertools.product(NOISE_AMOUNTS, [0, 0]))
+        augmentation_combos = list(set(itertools.product(NOISE_AMOUNTS, [0, 0])))
     else:
         augmentation_combos = list(itertools.product(NOISE_AMOUNTS, REMOVAL_AMOUNTS))
     
@@ -278,7 +278,7 @@ def train(args):
                 num_heads=args.num_heads,
                 d_model=args.d_model,
                 dropout=args.dropout,
-            )
+            ).to(device)
         
         # for distributed training
         if NUM_GPUS > 1:
@@ -345,6 +345,10 @@ def train(args):
                 best_val_loss = val_loss
                 # reset early stopping counter
                 count = 0
+                
+                # make checkpoint directory
+                if not Path(args.root, "checkpoints").exists():
+                    Path(args.root, "checkpoints").mkdir(parents=True)
 
                 # save best model
                 torch.save(
@@ -360,7 +364,7 @@ def train(args):
                         "removal_amount": removal_amount,
                         **args.__dict__
                     }, 
-                    f=f"{args.root}/pc_denoiser_{experiment_idx + 1}.pth"
+                    f=f"{args.root}/checkpoints/{args.task}_{experiment_idx + 1}.pth"
                 )
                 
                 print("Best model saved.")
@@ -412,7 +416,7 @@ def main():
     parser.add_argument('--dataset_ratio', type=float, default=DATASET_RATIO, help='Ratio of the training set to use')
     parser.add_argument('--noise_type', type=str, default=NOISE_TYPE, help="Type of noise to use (i.e. uniform or gaussian)")
     parser.add_argument('--use_rotations',  type=bool, default=USE_ROTATIONS, help="Applies random z-axis rotations.")
-    parser.add_argument('--task',  type=bool, default="completion", help="Learning task i.e. (completion or denoising) to run.")
+    parser.add_argument('--task',  type=str, default="completion", help="Learning task i.e. (completion or denoising) to run.")
 
     # parse args
     args = parser.parse_args()

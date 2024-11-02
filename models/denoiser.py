@@ -69,7 +69,7 @@ class DenoiserTransformer(nn.Module):
         
         # decode features to generate final point embeddings
         decoded_point_embeddings = self.decoder(
-            query_embeddings=encoder_features, encoder_features=encoder_features
+            query_embeddings=encoder_features[-1], encoder_features=encoder_features
         )
         
         # project back onto (x, y, z) to get estimated offset

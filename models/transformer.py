@@ -54,7 +54,6 @@ class QueryGenerator(nn.Module):
         query_embeddings = self.agg_projection(concat_features)
         return query_embeddings
     
-
 class DecoderLayer(nn.Module):
     """Single decoder layer."""
     def __init__(
