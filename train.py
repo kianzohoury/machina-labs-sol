@@ -17,13 +17,14 @@ from dataset.transform import RandomTransform
 from kaolin.metrics.pointcloud import chamfer_distance
 from models.completion import CompletionTransformer
 from models.denoiser import DenoiserTransformer
+from models.conv import DenoiserConv
 
 
 NUM_GPUS = torch.cuda.device_count()
 print(f"Number of GPUs available: {NUM_GPUS}")
 
 # default hyperparameters
-LR = 1e-4
+LR = 1e-3
 PATIENCE = 10
 WARMUP_RATIO = 0.1
 BATCH_SIZE = 16 * NUM_GPUS or 1 # in case a GPU is not available
@@ -34,15 +35,20 @@ NUM_HEADS = 8
 D_MODEL = 256
 DROPOUT = 0.1
 NUM_WORKERS = 8
-DATASET_RATIO = 0.3
+DATASET_RATIO = 0.5
 
 # training experiments: four fixed combinations representing the strength of point cloud augmentations
 # change these if you'd like to experiment with stronger augmentations
-NOISE_AMOUNTS = [0.01, 0.02]
+NOISE_AMOUNTS = [0.005, 0.005]
 REMOVAL_AMOUNTS = [0.25, 0.5]
 NOISE_TYPE = "uniform"
 USE_ROTATIONS = True
 
+
+def chamfer_distance_custom(p1, p2):
+    dist1, _ = torch.cdist(p1, p2).min(dim=2)
+    dist2, _ = torch.cdist(p2, p1).min(dim=2)
+    return (dist1.mean() + dist2.mean()) / 2
 
 class LRScheduler:
     """Custom learning rate scheduler that initially applies linear scaling for warmup and 
@@ -120,7 +126,7 @@ def train_epoch(
 
             # run forward pass
             y_pred = model(x)
-
+            
             # compute loss
             loss = chamfer_distance(p1=y_pred, p2=y_true).mean()
             total_loss += loss.item()
@@ -128,7 +134,7 @@ def train_epoch(
             # backprop + update parameters + update lr
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
 
             # clear gradients
             optimizer.zero_grad()
@@ -273,13 +279,17 @@ def train(args):
                 num_queries=int(args.max_points * removal_amount)
             ).to(device)
         else:
-            model = DenoiserTransformer(
-                num_layers=args.num_layers,
-                num_heads=args.num_heads,
-                d_model=args.d_model,
-                dropout=args.dropout,
-            ).to(device)
-        
+            # 1D convolutional model as a baseline
+            if args.conv:
+                model = DenoiserConv(d_model=args.d_model).to(device)
+            else:
+                model = DenoiserTransformer(
+                    num_layers=args.num_layers,
+                    num_heads=args.num_heads,
+                    d_model=args.d_model,
+                    dropout=args.dropout,
+                ).to(device)
+                
         # for distributed training
         if NUM_GPUS > 1:
             print("Running distributed training.")
@@ -289,12 +299,13 @@ def train(args):
         optimizer = AdamW(model.parameters(), lr=args.lr)
         max_batches = round((len(train_data) / args.batch_size) * args.dataset_ratio)
         total_steps = len(train_loader) * args.max_num_epochs
-        scheduler = LRScheduler(
-            optimizer=optimizer,
-            total_steps=total_steps,
-            step_size=args.batch_size,
-            warmup_ratio=args.warmup_ratio
-        )
+        # scheduler = LRScheduler(
+        #     optimizer=optimizer,
+        #     total_steps=total_steps,
+        #     step_size=1,
+        #     warmup_ratio=args.warmup_ratio
+        # )
+        scheduler = None
 
         print(f"Experiment: [{experiment_idx + 1}/{len(augmentation_combos)}]")
         print(f"eps={noise_amount}, r={removal_amount}\n" + "-" * 85)
@@ -355,8 +366,8 @@ def train(args):
                     obj={
                         "model": model.cpu().state_dict(),
                         "optimizer": optimizer.state_dict(),
-                        "warmup_scheduler": scheduler.warmup_scheduler.state_dict(),
-                        "decay_scheduler": scheduler.lr_decay_scheduler.state_dict(),
+                        # "warmup_scheduler": scheduler.warmup_scheduler.state_dict(),
+                        # "decay_scheduler": scheduler.lr_decay_scheduler.state_dict(),
                         "train_losses": train_losses,
                         "val_losses": val_losses,
                         "epoch": epoch,
@@ -364,7 +375,7 @@ def train(args):
                         "removal_amount": removal_amount,
                         **args.__dict__
                     }, 
-                    f=f"{args.root}/checkpoints/{args.task}_{experiment_idx + 1}.pth"
+                    f=f"{args.root}/checkpoints/{model.__class__.__name__}_{experiment_idx + 1}.pth"
                 )
                 
                 print("Best model saved.")
@@ -417,6 +428,7 @@ def main():
     parser.add_argument('--noise_type', type=str, default=NOISE_TYPE, help="Type of noise to use (i.e. uniform or gaussian)")
     parser.add_argument('--use_rotations',  type=bool, default=USE_ROTATIONS, help="Applies random z-axis rotations.")
     parser.add_argument('--task',  type=str, default="completion", help="Learning task i.e. (completion or denoising) to run.")
+    parser.add_argument('--conv',  action="store_true", help="Runs the baseline convolutional model.")
 
     # parse args
     args = parser.parse_args()

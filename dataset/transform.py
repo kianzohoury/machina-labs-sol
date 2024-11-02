@@ -25,7 +25,7 @@ def add_noise(
 ) -> torch.Tensor:
     """Randomly perturbs clean point cloud with specified type of noise."""
     if noise_type == "uniform":
-        random_noise = amount * torch.randn(size=point_cloud.shape)
+        random_noise = amount * (2 * torch.rand(size=point_cloud.shape) - 1)
     elif noise_type == "gaussian":
         random_noise = torch.normal(mean=0, std=amount, size=point_cloud.shape)
     else:
@@ -120,29 +120,37 @@ class RandomTransform:
     def __call__(self, point_cloud: torch.Tensor) -> Tuple:
         """Applies transformations to point cloud."""
         is_removed = is_noisy = False
-        prob_both = 1.0 if self.task is not None else torch.rand(1)
-        # apply both transformation
-        if prob_both < self.prob_both:
+        if self.task == "completion":
+            # apply point removal only
             num_remove = int(point_cloud.shape[0] * self.removal_amount)
             point_cloud = remove_neighboring_points(point_cloud=point_cloud, num_remove=num_remove)
+            is_removed = True
+        elif self.task == "denoising":
+            # apply noise only
             point_cloud = add_noise(
-                point_cloud=point_cloud, amount=self.noise_amount, noise_type=self.noise_type
-            )
-            is_removed = is_noisy = True
-        else:
-            if self.task is not None:
-                prob_one = 1.0 if self.task == "completion" else 0
-            else:
-                prob_one = torch.rand(1)
-            # apply only one transformation
-            if prob_one < 0.5:
-                point_cloud = add_noise(
-                    point_cloud=point_cloud, amount=self.noise_amount, noise_type=self.noise_type)
-                is_noisy = True
-            else:
+                point_cloud=point_cloud, amount=self.noise_amount, noise_type=self.noise_type)
+            is_noisy = True
+        elif self.task is None:
+            # randomly decide whether to apply noise, removal, or both
+            if torch.rand(1).item() < self.prob_both:
+                # apply both transformations
                 num_remove = int(point_cloud.shape[0] * self.removal_amount)
                 point_cloud = remove_neighboring_points(point_cloud=point_cloud, num_remove=num_remove)
-                is_removed = True
+                point_cloud = add_noise(
+                    point_cloud=point_cloud, amount=self.noise_amount, noise_type=self.noise_type)
+                is_removed = is_noisy = True
+            else:
+                # randomly choose one transformation
+                if torch.rand(1).item() < 0.5:
+                    # Apply noise
+                    point_cloud = add_noise(
+                        point_cloud=point_cloud, amount=self.noise_amount, noise_type=self.noise_type)
+                    is_noisy = True
+                else:
+                    # Apply point removal
+                    num_remove = int(point_cloud.shape[0] * self.removal_amount)
+                    point_cloud = remove_neighboring_points(point_cloud=point_cloud, num_remove=num_remove)
+                    is_removed = True
                 
         # also return a categorical label for the transformation
         # 0: identity, 1: is_removed, 2: is_noisy, 3: both
