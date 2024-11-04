@@ -24,31 +24,26 @@ NUM_GPUS = torch.cuda.device_count()
 print(f"Number of GPUs available: {NUM_GPUS}")
 
 # default hyperparameters
-LR = 1e-3
+LR = 1e-4
 PATIENCE = 10
 WARMUP_RATIO = 0.1
 BATCH_SIZE = 16 * NUM_GPUS or 1 # in case a GPU is not available
 MAX_NUM_EPOCHS = 100
 MAX_POINTS = 1024
-NUM_LAYERS = 4
+NUM_LAYERS = 8
 NUM_HEADS = 8
 D_MODEL = 256
 DROPOUT = 0.1
 NUM_WORKERS = 8
-DATASET_RATIO = 0.5
+DATASET_RATIO = 0.1
 
 # training experiments: four fixed combinations representing the strength of point cloud augmentations
 # change these if you'd like to experiment with stronger augmentations
-NOISE_AMOUNTS = [0.005, 0.005]
+NOISE_AMOUNTS = [0.05, 0.075]
 REMOVAL_AMOUNTS = [0.25, 0.5]
-NOISE_TYPE = "uniform"
+NOISE_TYPE = "gaussian"
 USE_ROTATIONS = True
 
-
-def chamfer_distance_custom(p1, p2):
-    dist1, _ = torch.cdist(p1, p2).min(dim=2)
-    dist2, _ = torch.cdist(p2, p1).min(dim=2)
-    return (dist1.mean() + dist2.mean()) / 2
 
 class LRScheduler:
     """Custom learning rate scheduler that initially applies linear scaling for warmup and 
@@ -85,6 +80,13 @@ class LRScheduler:
             self.warmup_scheduler.step()
         else:
             self.lr_decay_scheduler.step()
+            
+    def get_current_lr(self) -> float:
+        """Gets the current learning rate."""
+        if self.num_steps <= self.warmup_steps:
+            return self.warmup_scheduler.get_last_lr()[0]
+        else:
+            return self.lr_decay_scheduler.get_last_lr()[0]
 
 
 def worker_init_fn(worker_id) -> None:
@@ -134,14 +136,16 @@ def train_epoch(
             # backprop + update parameters + update lr
             loss.backward()
             optimizer.step()
-            # scheduler.step()
+            scheduler.step()
 
             # clear gradients
             optimizer.zero_grad()
 
             # display loss via logger
             mean_loss = total_loss / (batch_idx + 1)
-            tq.set_postfix({"mean_loss": round(mean_loss, 7)})
+            tq.set_postfix(
+                {"mean_loss": round(mean_loss, 7), "lr": scheduler.get_current_lr()}
+            )
 
             if batch_idx == max_batches:
                 break
@@ -298,14 +302,13 @@ def train(args):
         # instantiate optimizer and LR warmup scheduler
         optimizer = AdamW(model.parameters(), lr=args.lr)
         max_batches = round((len(train_data) / args.batch_size) * args.dataset_ratio)
-        total_steps = len(train_loader) * args.max_num_epochs
-        # scheduler = LRScheduler(
-        #     optimizer=optimizer,
-        #     total_steps=total_steps,
-        #     step_size=1,
-        #     warmup_ratio=args.warmup_ratio
-        # )
-        scheduler = None
+        total_steps = max_batches * args.max_num_epochs
+        scheduler = LRScheduler(
+            optimizer=optimizer,
+            total_steps=total_steps,
+            step_size=1,
+            warmup_ratio=args.warmup_ratio
+        )
 
         print(f"Experiment: [{experiment_idx + 1}/{len(augmentation_combos)}]")
         print(f"eps={noise_amount}, r={removal_amount}\n" + "-" * 85)
@@ -392,7 +395,9 @@ def train(args):
         
         
 def get_baseline_chamfer_dist(dataloader: DataLoader, device: str) -> float:
-    """Gets the baseline (total Chamfer Distance across the whole dataset."""
+    """Gets the baseline between augmented inputs and clean labels 
+    (average Chamfer Distance across the whole dataset).
+    """
     total_chamf_dist_without_model = 0
     for example in dataloader:
         noisy_point_cloud, target_point_cloud = example[-2:]

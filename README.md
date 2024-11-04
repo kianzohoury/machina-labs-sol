@@ -210,10 +210,10 @@ where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}
 More specifically, I treated both denoising and point completion as a set-to-set translation problem, utilizing an encoder-decoder architecture. For both tasks, I felt it was necessary to include a decoder on top of an encoder, since sequence to sequence translation models use this architecture, and the general idea of an autoencoder is to utilize an encoder for feature extraction and a decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
 
 #### CompletionTransformer
-The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, given the local/global contextual information provided by the encoder at each corresponding layer.
+The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the local/global contextual information provided by the encoder at each corresponding layer.
 
 #### DenoisingTransformer
-The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could soley focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder.
+The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could solely focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct point embeddings.
 
 I should also note that for both models, I did not use positional embeddings, since point clouds inherently contain positional information. However, some methods in the literature use geometric embeddings, utilizing k nearest neighbors (k-NN) to extract local information for each point. In hindsight, if I had more time, I would've explored using pre-trained models to extract embeddings; however, for the purposes of this assignment, I implemeneted learned embeddings to project the points into a higher dimensional space, and used a similar method to map the decoder's final feature embeddings back to $\mathbb{R}^3$.
 
@@ -241,7 +241,7 @@ $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising/point completion model.
 
 #### **Experimental Setup**
-As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.01, 0.02$ and $r=0.25, 0.5$:
+As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.075, 0.1$ and $r=0.25, 0.5$:
 
 | Model  | noise strength (%) | points removed (%) |
 | :---------------- | :------: | :----: |
@@ -345,6 +345,13 @@ It's always good practice to visualize your model performance during and after t
   <img src="docs/denoise_plane_comp.png" alt="Image 2" width="70%" />
   <img src="docs/denoise_cap_comp.png" alt="Image 3" width="60%" />
 </p>
+
+<p align="center">
+  <img src="docs/completion_chair_comp.png" alt="Image 1" width="60%" />
+  <img src="docs/completion_plane_comp.png" alt="Image 2" width="70%" />
+  <img src="docs/completion_table_comp.png" alt="Image 3" width="60%" />
+</p>
+
 
 ## Task II: Generating Synthetic Defects with Diffusion Models
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
