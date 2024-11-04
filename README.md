@@ -19,43 +19,52 @@ pip install -r requirements.txt
 One of the required libraries in particular (NVIDIA's **kaolin**) relies on the exact versions of PyTorch and CUDA you have on your machine. If you do not have CUDA, you will not be able to run any model training, which is fine if you are just looking to read my code and possibly run inference. For this assignment, I primarily developed on Colab and used Lambda Cloud for distributed training, which had a later version of CUDA (12.4). The following had to be installed for my setup:
 ```bash
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
-pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html
+pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu124.html
 ```
 
 ## Problem Understanding
 3D sensors like LiDAR are prone to generating noisy and incomplete point clouds, due to several factors like hardware/sensor limitations, human error, environment, etc. Thus, there is a strong need for deep neural networks to process and restore noisy/incomplete point clouds, to enable important downstream tasks, especially in the realm of manufacturing such as process monitoring and quality control. Without accurate data, the models (e.g. defect detection models) that drive these downstream tasks cannot make reliable predictions, and so the quality of manufactured parts cannot be reliably monitored or certified.
 
 ### Noisy Data
-Point clouds affected by noise are problematic because the actual $(x, y, z)$ coordinate positions are unknown, and so the observed points derived from the 3D scanning process are not accurate. Even small amounts of noise can cause uncertainty for a downstream detection model, especially if the defects intended to be recognized are small. In computer vision, several methods have been introduced to denoise images (e.g. denoising autoencoders). In the context of geometric data, similar deep neural network architectures can be adapted to denoise point clouds, by essentially learning spatial/geometrics features associated with objects represented by entire point clouds, and "removing" noise by adjusting the coordinate positions of the corresponding/affected points.
+Point clouds affected by noise are problematic because the actual $(x, y, z)$ coordinate positions are unknown, and so the observed points derived from the 3D scanning process are not accurate. Even small amounts of noise can cause uncertainty for a downstream detection model, especially if the defects intended to be recognized are small. In computer vision, several methods have been introduced to denoise images (e.g. denoising autoencoders). In the context of geometric data, similar deep neural network architectures can be adapted to denoise point clouds, by essentially learning spatial/geometric features associated with objects represented by entire point clouds, and "removing" noise by adjusting the coordinate positions of the corresponding/affected points.
 
 ### Incomplete Data
-Even if noise can be reduced significantly, 3D scans may sometimes have only partial information. Again, due to several factors, a significant number of points can go missing, and retrieving those points may be impossible altogether. Therefore, we also need deep neural networks that can extrapolate the set of points that serve to "complete" the partial point cloud. Again, in computer vision, architectures like masked autoencoders attempt to fill in unknown/masked sections of images by relying on local features. Likewise, point completion models in the context of geometric data like point clouds can similarly rely on contextual information like surrounding points, to fill in sections of the object that are missing.
+Even if noise can be reduced significantly, 3D scans may sometimes have only partial information. Again, due to several factors, a significant number of points can go missing, and retrieving those points may be impossible altogether. Therefore, we also need deep neural networks that can extrapolate the set of points that serve to "complete" the partial point cloud. Again, in computer vision, architectures like masked autoencoders attempt to fill in unknown/masked sections of images by relying on local features. Likewise, point completion models in the context of geometric data like point clouds can similarly rely on contextual information like surrounding points, to fill in sections of the object that are missing. However, the challenging aspect of point completion is capturing enough relevant context, both locally *and* globally in order for the model to understand what the partial/unknown object is and the points it needs to generate.
 
 ### Lack of Defect Data in Manufacturing
-Additionally, when it comes to manufacturing, there is a need for high quality data used for training defect detection models. However, in situations where the quantity of data containing certain defects (e.g. tears, dents, cracks) is lacking, we need to simulate such defects. While it's possible to train detection models on limited data, we cannot be certain they are generalize well to unseen, real-world data. In order to create more robust detection models, we need to generate additional data in a controlled manner. Conditional generative models enable the creation of synthetic data given an input such as a text prompt. Diffusion models, in particular, are well-equiped to generate a variety of examples of certain defect types, if we can somehow prepare/collect an initial distribution of defective point clouds that we want to model. However, the main issue with synthetic data is achieving realism; that is, data that is plausible and helpful in training a downstream detection/classification model, by improving its performance and filling in parts of the distribution of training data that was previously not well represented.
+Additionally, when it comes to manufacturing, there is a need for high quality data used for training defect detection models. However, in situations where the quantity of data containing certain defects (e.g. tears, dents, cracks) is lacking, we need to simulate such defects. While it's possible to train detection models on limited data, we cannot be certain they are generalize well to unseen, real-world data. In order to create more robust detection models, we need to generate additional, high quality data in a controlled manner. Conditional generative models can do exactly that, as they enable the creation of synthetic data given an input such a text prompt. Diffusion models, in particular, are well-equiped to generate a variety of examples of a specific class (e.g. defect type), if we can somehow prepare/collect an initial distribution of data (in this case, defective point clouds) that we wish to model. However, the main issue with synthetic data is achieving realism; that is, data that is plausible and helpful in training a downstream detection/classification model, by improving its performance and filling in gaps in the data distribution that were not well-represented before.
 
 ## Dataset
 
-The dataset I selected to train models for both tasks is **ShapeNetCore**, which is a subset of ShapeNet. It contains 16 popular classes of objects as point clouds. There are a few other datasets I could've used, but ultimately decided on ShapeNetCore due to pragmatism -- I was able to download it instantly from Kaggle, while the full ShapeNet and ModelNet40 required submitting email requests to download, and I needed to get to work quickly. However, I still believe the models I've trained on this dataset could easily be transferred to real-world data scanned from metal parts, as it has a reasonably diverse range of object geometries.
+The dataset I chose for solving the three outlined problems is called **ShapeNetCore**, which is a subset of ShapeNet. It contains 16 popular classes of objects as point clouds. There are a few other datasets I could've used, but ultimately decided on ShapeNetCore due to pragmatism -- I was able to download it instantly from Kaggle, while the full ShapeNet and ModelNet40 required submitting email requests to download, and I needed to get to work quickly. However, I still believe the models I've trained on this dataset could easily be transferred to real-world data scanned from metal parts, as it has a reasonably diverse range of object geometries.
 
+<p align="center">
+  <img src="docs/class_distribution_bar.png" alt="Image 99" width="40%" />
+  <img src="docs/table_2048.png" alt="Image 99" width="25%" />
+</p>
+
+<p align="center">
+  <i>Class distribution and example point cloud of a table with 2048 points.</i>
+</p>
+
+One limitation with the version of ShapeNetCore I downloaded is that the point clouds are fairly sparse (vs. dense point clouds with >= 10k points), presumably because they were already down-sampled. Larger point clouds equate to more computational load, but also better models, so the models I designed would likely be improved with richer point cloud sets.
 
 ## Task I: Point Cloud Denoising & Completion
 
-As outlined in the problem understanding section, there are two main tasks: denoising and completion. For both tasks, we will use the same point cloud dataset, which we will augment/modify in order to create labeled training examples consisting of noisy/incomplete inputs and clean target point clouds.
+As outlined in the problem understanding section, the two main tasks are point cloud denoising and completion. For both tasks, we will use the same underlying source data, but we will augment/transform them differently based on the task that we are solving, and in order to create labeled training examples consisting of noisy/incomplete inputs and clean target point clouds.
 
 ### **Dataset Preparation**
 
-In order to load and work with the point cloud data as PyTorch tensors, I created the `ShapeNetCore` Dataset class, which was designed for loading examples from ShapeNetCore containing pairs of the form $(x, y)$, with $x$ being a noisy version of the original/clean point cloud $y$.
+In order to load and work with the point cloud data as PyTorch tensors, I created the `ShapeNetCore` Dataset class, which was designed for loading examples from ShapeNetCore containing pairs of the form $(x, y)$, with $x$ being a noisy/incomplete version of the original/clean point cloud $y$.
 
 In order to accomplish this, I did the following:
 * read `.json` metadata files containing the class labels and locations of their `.npy` files,
 * loaded `.npy` files as numpy arrays, changed point clouds from `XZY` to `XYZ` format (this was more of a convenience for plotting), and converted the data to tensors
-* applied several **pre-processing** and **data augmentation** steps for the denoising task, which I will describe next,
-* and lastly converted all arrays into PyTorch tensors for training
+* applied several **pre-processing** and **data augmentation** steps for the denoising task, which I will describe next
 
 #### **Pre-Processing**
 
-Pre-processing is extremely crucial in most deep learning problems. Fortunately, since the point clouds from ShapeNet are already clean, the only pre-processing I had to do for them is **normalization** and **down-sampling**, due to the point clouds not being standardized when it comes to scale, nor in the density/number of points.
+Pre-processing is extremely crucial in most deep learning problems, especially for computer vision. Fortunately, since the point clouds from ShapeNet are already clean (aka noise-free), the only pre-processing I had to do for them is **normalization** and **down/up-sampling**, due to the point clouds not being standardized when it comes to scale, nor in the density/number of points.
 
 ##### Normalization
 The reason it's crucial for each point cloud to fit within the same scale is because at test time, if a model recieves data on a different scale, it may generalize very poorly, so it's something we need to always think about. More importantly, when adding perturbations like noise for the denoising task, it's imperative that the randomly generated noise is also on the same scale, otherwise you get very weird looking point clouds (which I encountered before normalization).
