@@ -350,11 +350,11 @@ It's always good practice to visualize your model performance during and after t
   <img src="docs/denoiser_train_val_comp.png" alt="Image 2" width="100%" />
 </p>
 
+
 ##### CompletionTransformer
 <p align="center">
-  <img src="docs/completion_curves.png" alt="Image 2" width="70%" />
+  <img src="docs/completion_train_val_comp.png" alt="Image 99" width="100%" />
 </p>
-
 
 ### Model Evaluation
 #### Test Performance
