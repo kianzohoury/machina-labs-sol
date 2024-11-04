@@ -404,6 +404,37 @@ The following images are generated from the same test set with the denoising mod
 ##### Completion
 The following images are generated from the same test set with the completion model trained with 50% of points missing:
 
+*class: car*
+<p align="center">
+  <img src="docs/ct1_car.png" alt="Image 1" width="70%" />
+</p>
+
+*class: chair*
+<p align="center">
+  <img src="docs/ct1_chair.png" alt="Image 1" width="80%" />
+</p>
+
+*class: earphone*
+<p align="center">
+  <img src="docs/ct1_earphone.png" alt="Image 1" width="80%" />
+</p>
+
+*class: airplane*
+<p align="center">
+  <img src="docs/ct1_plane_1.png" alt="Image 1" width="80%" />
+</p>
+
+*class: airplane*
+<p align="center">
+  <img src="docs/ct1_plane_2.png" alt="Image 1" width="80%" />
+</p>
+
+*class: table*
+<p align="center">
+  <img src="docs/ct1_table.png" alt="Image 1" width="80%" />
+</p>
+
+
 ## Task II: Generating Synthetic Defects with Diffusion Models
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
 
