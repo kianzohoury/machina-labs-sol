@@ -254,7 +254,7 @@ As mentioned in the data preparation section, I dynamically augmented the point 
 ##### **Hyperparameters**
 The hyperparameters for training the denoising models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments, due to simplicity and the time constraint for this assignment. However, in practice one should optimize the hyperparameters separately for each of these four models as the distribution of the training data will be slightly to significantly different based on how different or extreme the data augmentations are for each combination.
 
-* learning rate: $1e-3$
+* learning rate: $1e-4$
 * warmup ratio: $0.1$
 * batch size: $8$ x number of GPUs
 * max number of epochs: $300$

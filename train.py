@@ -369,8 +369,8 @@ def train(args):
                     obj={
                         "model": model.cpu().state_dict(),
                         "optimizer": optimizer.state_dict(),
-                        # "warmup_scheduler": scheduler.warmup_scheduler.state_dict(),
-                        # "decay_scheduler": scheduler.lr_decay_scheduler.state_dict(),
+                        "warmup_scheduler": scheduler.warmup_scheduler.state_dict(),
+                        "decay_scheduler": scheduler.lr_decay_scheduler.state_dict(),
                         "train_losses": train_losses,
                         "val_losses": val_losses,
                         "epoch": epoch,
