@@ -41,7 +41,7 @@ The dataset I selected to train models for both tasks is **ShapeNetCore**, which
 
 ## Task I: Point Cloud Denoising & Completion
 
-As outlined in the Problem Understanding section...
+As outlined in the problem understanding section, there are two main tasks: denoising and completion. For both tasks, we will use the same point cloud dataset, which we will augment/modify in order to create labeled training examples consisting of noisy/incomplete inputs and clean target point clouds.
 
 ### **Dataset Preparation**
 
@@ -120,7 +120,7 @@ def add_noise(
 ) -> torch.Tensor:
     """Randomly perturbs clean point cloud with specified type of noise."""
     if noise_type == "uniform":
-        random_noise = amount * torch.randn(size=point_cloud.shape)
+        random_noise = amount * (2 * torch.rand(size=point_cloud.shape) - 1)
     elif noise_type == "gaussian":
         random_noise = torch.normal(mean=0, std=amount, size=point_cloud.shape)
     else:
