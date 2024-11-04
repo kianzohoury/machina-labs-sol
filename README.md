@@ -241,16 +241,15 @@ $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising/point completion model.
 
 #### **Experimental Setup**
-As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.01, 0.02$ and $r=0, 0.5$:
+As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.01, 0.02$ and $r=0.25, 0.5$:
 
 | Model  | noise strength (%) | points removed (%) |
 | :---------------- | :------: | :----: |
-| PCDenoiser     |   1   | 0     |
-| PCDenoiser     |   2   | 0   |
-| PCCompletion     |  0    | 25     |
-| PCCompletion    |  0    | 50   |
+| DenoiserTransformer     |   1   | 0     |
+| DenoiserTransformer   |   2   | 0   |
+| CompletionTransformer    |  0    | 25     |
+| CompletionTransformer   |  0    | 50   |
     
-Initially, I had created a model architecture that could combine both tasks, but ultimately decided the split the tasks into two separate models.
 
 ##### **Hyperparameters**
 The hyperparameters for training the denoising models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments, due to simplicity and the time constraint for this assignment. However, in practice one should optimize the hyperparameters separately for each of these four models as the distribution of the training data will be slightly to significantly different based on how different or extreme the data augmentations are for each combination.
@@ -319,14 +318,30 @@ One insightful validation/evaluation strategy is to also compare these models ag
 The final model and checkpoint file that would be ultimately saved was the one tied to the highest validation performance (lowest total $L_{CD}$ loss), not the one resulting after all 100 epochs of training was completed.
 
 
-##### **Visualizing Loss Curves**
+#### Run Training
+To run model training, use the following command:
+```bash
+python train.py --task denoising --dataset_ratio 0.1 --num_layers 4 --max_num_epochs 10
+```
+which will run the specific model training task (i.e. denoising or completion). The above justs tests the functionality of the training code, since it only trains the model for a maximum of 10 epochs using only 10% of the training set on a smaller model with just 4 encoder/decoder layers.
 
-It's always good practice to visualize your model performance during and after training. Usually, I will start with something like tensorboard because it is easy to integrate and track experiments, but I kept it simple for this assignment and just saved the per-epoch train and validation losses with `torch.save()`. Below, I've defined a plotting function that compares the said training and validation losses across all epochs and for each denoising model.  
+#### Optional: Download My Trained Models
+To download the model checkpoints I trained previously, run the following commands:
+```bash
+huggingface-cli download kianzohoury/shapenet_tasks --local-dir ./checkpoints
+```
+which will save the denoising and point completion model checkpoints as `.pth` files in the `machina-labs-sol/checkpoints` directory.
 
+#### **Visualizing Loss Curves**
+
+It's always good practice to visualize your model performance during and after training. Usually, I will start with something like tensorboard because it is easy to integrate and track experiments, but I kept it simple for this assignment and just saved the per-epoch train and validation losses with `torch.save()`. Below, we can see the training and validation results of the four models:
+
+### Model Evaluation
+#### Test Performance
+#### Visualizing Denoised/Completed Point Clouds
 
 
 ## Task II: Generating Synthetic Defects with Diffusion Models
-
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
 
 As mentioned in the problem understanding section, training a robust defect detection system relies on having a rich and diverse distribution of defects, with many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
