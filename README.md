@@ -347,7 +347,7 @@ It's always good practice to visualize your model performance during and after t
 
 ##### DenoiserTransformer
 <p align="center">
-  <img src="docs/denoiser_train_val_comp.png" alt="Image 2" width="70%" />
+  <img src="docs/denoiser_train_val_comp.png" alt="Image 2" width="100%" />
 </p>
 
 ##### CompletionTransformer
