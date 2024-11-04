@@ -212,6 +212,10 @@ More specifically, I treated both denoising and point completion as a set-to-set
 #### CompletionTransformer
 The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the local/global contextual information provided by the encoder at each corresponding layer.
 
+<p align="center">
+  <img src="docs/completiontransformer.png" alt="Image 1" width="40%" />
+</p>
+
 #### DenoisingTransformer
 The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could solely focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct point embeddings.
 
