@@ -225,7 +225,11 @@ Furthermore, before training, we need to determine an appropriate loss function 
 #### **Loss Function**
 We can unify both tasks with a single loss function, namely, **Chamfer Distance**. It is defined as:
 
-$$L_{CD}(P_{1}, P_{2}) = \frac{1}{|P_{1}|}\sum_{p \in P_{1}} \min_{p' \in P_{2}} ||p - p'||_{2}^2 + \frac{1}{|P_{2}|}\sum_{p' \in P_{2}} \min_{p \in P_{1}} ||p' - p||_{2}^2$$
+<!-- $$L_{CD}(P_{1}, P_{2}) = \frac{1}{|P_{1}|}\sum_{p \in P_{1}} \min_{p' \in P_{2}} ||p - p'||_{2}^2 + \frac{1}{|P_{2}|}\sum_{p' \in P_{2}} \min_{p \in P_{1}} ||p' - p||_{2}^2$$ -->
+
+<p align="center">
+  <img src="docs/chamfer.png" alt="Image 1" width="40%" />
+</p>
 
 Note that I used the Euclidean distance formulation here (but $||\cdot||_{1}$ norm is sometimes used). Given two point clouds $P_1 \in \mathbb{R}^3$, $P_2 \in \mathbb{R}^3$, it essentially measures the distance between them. Specifically, for every point in $P_1$, it measures the distance between the nearest point in $P_2$, and vice versa. One thing to consider is that efficiently implementing this loss requires an efficient method of computing nearest neighbors (e.g. using K-D trees). In order to maximize efficiency (training speed), I've shamelessly decided to utilize NVIDIA's kaolin library, as their implementation uses special CUDA-related optimizations.
 
