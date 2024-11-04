@@ -360,6 +360,12 @@ It's always good practice to visualize your model performance during and after t
 #### Test Performance
 The denoising and completion models were finally evaluated on a hold-out test set and the results are shown below:
 
+|   | Model                   | Noise Amount | Removal Ratio | Avg Chamfer Dist | Avg Chamfer Dist Baseline |
+|---|--------------------------|--------------|---------------|------------------|---------------------------|
+| 0 | completion_transformer_1 | 0.000        | 0.50          | 0.002907         | 0.091590                  |
+| 1 | completion_transformer_2 | 0.000        | 0.25          | 0.001228         | 0.017856                  |
+| 2 | denoiser_transformer_1   | 0.075        | 0.00          | 0.003186         | 0.007781                  |
+| 3 | denoiser_transformer_2   | 0.050        | 0.00          | 0.002601         | 0.004487                  |
 
 #### Visualizing Denoised/Completed Point Clouds
 
