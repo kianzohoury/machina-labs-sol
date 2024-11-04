@@ -6,10 +6,16 @@
 
 
 ## Setup
-To set up the environment with the necessary dependencies for this assignment, please `cd` into `machina-labs` and run the following using pip:
+To get started, clone the repository:
+```bash 
+git clone https://github.com/kianzohoury/machina-labs-sol.git
+```
+
+Once the project is downloaded locally, we must set up the environment with the necessary dependencies. Please `cd` into `machina-labs-sol` and run the following using pip:
 ```bash
 pip install -r requirements.txt
 ```
+
 One of the required libraries in particular (NVIDIA's **kaolin**) relies on the exact versions of PyTorch and CUDA you have on your machine. If you do not have CUDA, you will not be able to run any model training, which is fine if you are just looking to read my code and possibly run inference. For this assignment, I primarily developed on Colab and used Lambda Cloud for distributed training, which had a later version of CUDA (12.4). The following had to be installed for my setup:
 ```bash
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
@@ -17,20 +23,12 @@ pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/t
 ```
 
 ## Problem Understanding
+3D sensors like LiDAR are prone to generating noisy and incomplete point clouds, due to several factors like hardware/sensor limitations, human error, environment, etc. Thus, there is a strong need for deep neural networks to process and restore noisy/incomplete point clouds, to enable important downstream tasks, especially in the realm of manufacturing, like processing monitoring and quality control. Without accurate data, the models (e.g. defect detection models) that drive these downstream tasks cannot make reliable predictions, and so the quality of manufactured parts cannot be reliably monitored or certified.
 
-However,
-raw data of point clouds captured by existing 3D sensors are usually incomplete and sparse due
-to occlusion, limited sensor resolution, and light reflection [4–8], which can negatively impact
-the performance of downstream tasks that require high-quality representation, such as point cloud
-segmentation and detection. Point cloud completion [9] refers to the task of inferring the complete
-shape of an object or scene from incomplete raw point clouds. Recently, many (deep) learning based
-approaches have been introduced to point cloud completion ranging from supervised learning, selfsupervised learning to unsupervised learning [10–15].
+### Noisy Data
+Point clouds affected by noise are problematic because the $(x, y, z)$ actual coordinate positions are unknown, and so the observed points derived from the 3D scanning process are not accurate. Even if the level is low, noise can cause uncertainty for a downstream detection model, especially if the defects intended to be recognized are small. In computer vision, several methods have been introduced to denoise images, with denoising autoencoders, for example. In the context of geometric data, similar deep neural network architectures can be adapted to denoise point clouds, by essentially learning spatial features associated with entire point clouds, and "removing" noise by adjusting the coordinate positions of the corresponding/affected points.
 
-we model point
-cloud completion as a set-to-set translation task, where
-the transformers take the point proxies of the partial point
-clouds as the inputs and produce the point proxies of the
-missing parts. 
+### Incomplate Data
 
 
 ## Dataset
