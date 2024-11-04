@@ -366,24 +366,37 @@ The denoising and completion models were finally evaluated on a hold-out test se
 ##### Denoising
 The following images are generated from the same test set with the denoising model trained on 7.5% gaussian noise:
 
+*class: chair*
 <p align="center">
   <img src="docs/d1_chair_1.png" alt="Image 1" width="60%" />
 </p>
+
+*class: chair*
 <p align="center">
   <img src="docs/d1_chair_2.png" alt="Image 1" width="70%" />
 </p>
+
+*class: chair*
 <p align="center">
   <img src="docs/d1_chair_3.png" alt="Image 1" width="70%" />
 </p>
+
+*class: table*
 <p align="center">
   <img src="docs/d1_table_1.png" alt="Image 1" width="60%" />
 </p>
+
+*class: airplane*
 <p align="center">
   <img src="docs/d1_plane.png" alt="Image 1" width="70%" />
 </p>
+
+*class: car*
 <p align="center">
   <img src="docs/d1_car.png" alt="Image 1" width="70%" />
 </p>
+
+*class: cap*
 <p align="center">
   <img src="docs/d1_cap.png" alt="Image 1" width="70%" />
 </p>
