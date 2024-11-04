@@ -35,7 +35,7 @@ NUM_HEADS = 8
 D_MODEL = 256
 DROPOUT = 0.1
 NUM_WORKERS = 8
-DATASET_RATIO = 0.1
+DATASET_RATIO = 1
 
 # training experiments: four fixed combinations representing the strength of point cloud augmentations
 # change these if you'd like to experiment with stronger augmentations
@@ -365,6 +365,7 @@ def train(args):
                     Path(args.root, "checkpoints").mkdir(parents=True)
 
                 # save best model
+                model_name = model.__class__.__name__ if NUM_GPUS <= 1 else model.module.__class__.__name__
                 torch.save(
                     obj={
                         "model": model.cpu().state_dict(),
@@ -378,7 +379,7 @@ def train(args):
                         "removal_amount": removal_amount,
                         **args.__dict__
                     }, 
-                    f=f"{args.root}/checkpoints/{model.__class__.__name__}_{experiment_idx + 1}.pth"
+                    f=f"{args.root}/checkpoints/{model_name}_{experiment_idx + 1}.pth"
                 )
                 
                 print("Best model saved.")
