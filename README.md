@@ -215,15 +215,10 @@ The architecture for the point completion model consists of an encoder, decoder,
 #### DenoisingTransformer
 The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could soley focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder.
 
-
-
-* explain why we can't use regular positional embeddings (non-discrete values)
-* explain why causal mask is not required
-* explain why purely encoder or decoder were not chosen
-* explain how this is sort of like seq2seq, T5, etc. and why that allows us to generate more points as needed by the decoder with next token prediction
+I should also note that for both models, I did not use positional embeddings, since point clouds inherently contain positional information. However, some methods in the literature use geometric embeddings, utilizing k nearest neighbors (k-NN) to extract local information for each point. In hindsight, if I had more time, I would've explored using pre-trained models to extract embeddings; however, for the purposes of this assignment, I implemeneted learned embeddings to project the points into a higher dimensional space, and used a similar method to map the decoder's final feature embeddings back to $\mathbb{R}^3$.
 
 ### Training Denoising/Point Completion Models
-Now that the model architecture is outlined, we have to solve both tasks of (1) denoising point clouds and (2) completing point clouds with randomly missing points. While these can be thought of as distinct tasks, where one model could learn to denoise (e.g. denoising autoencoder) and another model solely for point completion, they could also in theory, be combined, which is initially what I did. In some sense, missing points is a form of "noise" as it results in a lossy data point that increases the uncertainty of a classification model designed to classify a point cloud. However, I found more success training separate models for each task.
+Now that the model architectures are outlined, we have to solve both tasks of (1) denoising point clouds and (2) completing point clouds with randomly missing points. However, I would also like to note that while these can be thought of as distinct tasks, where one model could learn to denoise (e.g. denoising autoencoder) and another model solely for point completion, they could also in theory, be combined, which is initially what I did, until I found it easier/cleaner to split up the models. In some sense, missing points is a form of "noise" as it results in lossy data that would likely increase the uncertainty of a classification model designed to classify a point cloud. 
 
 Furthermore, before training, we need to determine an appropriate loss function that is not only well-suited for this task, but also differentiable. This is key, as it enables us to optimize our model using gradient descent, which requires differentiability to calculate gradients and run backpropagation.
 
@@ -235,11 +230,11 @@ $$L_{CD}(P_{1}, P_{2}) = \frac{1}{|P_{1}|}\sum_{p \in P_{1}} \min_{p' \in P_{2}}
 Note that I used the Euclidean distance formulation here (but $||\cdot||_{1}$ norm is sometimes used). Given two point clouds $P_1 \in \mathbb{R}^3$, $P_2 \in \mathbb{R}^3$, it essentially measures the distance between them. Specifically, for every point in $P_1$, it measures the distance between the nearest point in $P_2$, and vice versa. One thing to consider is that efficiently implementing this loss requires an efficient method of computing nearest neighbors (e.g. using K-D trees). In order to maximize efficiency (training speed), I've shamelessly decided to utilize NVIDIA's kaolin library, as their implementation uses special CUDA-related optimizations.
 
 #### **Training Objective**
-This is a supervised machine learning problem, where we have a training set $\mathcal{D}_{i}^{N} = \{(x_1, y_2),...,(x_N, y_N)\}$ with noisy input point clouds and their corresponding original ground truth point clouds. Our training objective is to find the optimal set of parameters $\theta$ of our model that minimizes the expected loss over the entire dataset, namely:
+This is a supervised machine learning problem, where we have a training set $\mathcal{D}_{i}^{N} = \{(x_1, y_2),...,(x_N, y_N)\}$ with noisy/incomplete input point clouds and their corresponding original ground truth point clouds. In the denoising task, the inputs have the same number of points as the ouputs, i.e. $|x_i| = |y_i|$, whereas in the point completion task, the outputs have more points, i.e. $|x_i| < |y_i|$. Our training objective is to find the optimal set of parameters $\theta$ of our model that minimizes the expected loss over the entire dataset, namely:
 
 $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 
-where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising model.
+where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising/point completion model.
 
 #### **Experimental Setup**
 As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.01, 0.02$ and $r=0, 0.5$:
