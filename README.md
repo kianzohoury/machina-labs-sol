@@ -358,18 +358,32 @@ It's always good practice to visualize your model performance during and after t
 
 ### Model Evaluation
 #### Test Performance
+The denoising and completion models were finally evaluated on a hold-out test set and the results are shown below:
+
+
 #### Visualizing Denoised/Completed Point Clouds
+The following images are generated from the same test set with the model trained on 7.5% noise:
 
 <p align="center">
-  <img src="docs/denoise_chair_comp.png" alt="Image 1" width="60%" />
-  <img src="docs/denoise_plane_comp.png" alt="Image 2" width="70%" />
-  <img src="docs/denoise_cap_comp.png" alt="Image 3" width="60%" />
+  <img src="docs/d1_chair_1.png" alt="Image 1" width="50%" />
 </p>
-
 <p align="center">
-  <img src="docs/completion_chair_comp.png" alt="Image 1" width="60%" />
-  <img src="docs/completion_plane_comp.png" alt="Image 2" width="70%" />
-  <img src="docs/completion_table_comp.png" alt="Image 3" width="60%" />
+  <img src="docs/d1_chair_2.png" alt="Image 1" width="60%" />
+</p>
+<p align="center">
+  <img src="docs/d1_chair_3.png" alt="Image 1" width="60%" />
+</p>
+<p align="center">
+  <img src="docs/d1_table_1.png" alt="Image 1" width="50%" />
+</p>
+<p align="center">
+  <img src="docs/d1_plane.png" alt="Image 1" width="60%" />
+</p>
+<p align="center">
+  <img src="docs/d1_car.png" alt="Image 1" width="60%" />
+</p>
+<p align="center">
+  <img src="docs/d1_cap.png" alt="Image 1" width="60%" />
 </p>
 
 
