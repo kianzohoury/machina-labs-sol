@@ -28,7 +28,7 @@ pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/t
 ### Noisy Data
 Point clouds affected by noise are problematic because the actual $(x, y, z)$ coordinate positions are unknown, and so the observed points derived from the 3D scanning process are not accurate. Even small amounts of noise can cause uncertainty for a downstream detection model, especially if the defects intended to be recognized are small. In computer vision, several methods have been introduced to denoise images (e.g. denoising autoencoders). In the context of geometric data, similar deep neural network architectures can be adapted to denoise point clouds, by essentially learning spatial/geometrics features associated with objects represented by entire point clouds, and "removing" noise by adjusting the coordinate positions of the corresponding/affected points.
 
-### Incomplate Data
+### Incomplete Data
 Even if noise can be reduced significantly, 3D scans may sometimes have only partial information. Again, due to several factors, a significant number of points can go missing, and retrieving those points may be impossible altogether. Therefore, we also need deep neural networks that can extrapolate the set of points that serve to "complete" the partial point cloud. Again, in computer vision, architectures like masked autoencoders attempt to fill in unknown/masked sections of images by relying on local features. Likewise, point completion models in the context of geometric data like point clouds can similarly rely on contextual information like surrounding points, to fill in sections of the object that are missing.
 
 ### Lack of Defect Data in Manufacturing
@@ -201,7 +201,7 @@ def rotate_z_axis(point_cloud: torch.Tensor) -> torch.Tensor:
 
 ### Define Model Architecture
 
-The architecture that I chose leverages transformers as they are highly adaptable beyond natural language tasks, including vision and geometric data such as the types of data (i.e. point clouds) we're dealing with. The idea behind using transformers is two-fold: (1) they are extremely powerful and easy to scale, as we can increase the depth of the model with a single line of code in PyTorch; (2) and more importantly, they utilize self-attention [], which is a highly important concept that allows for deep learning models to learn long-range dependencies and rich contextual information. Self-attention is defined as:
+The architecture that I chose leverages transformers as they are highly adaptable beyond natural language tasks, including vision and geometric data such as the types of data (i.e. point clouds) we're dealing with. The idea behind using transformers is two-fold: (1) they are extremely powerful and easy to scale, as we can increase the depth of the model with a single line of code in PyTorch; (2) and more importantly, they utilize self-attention, which is a highly important concept that allows the model to learn potentially global/long-range dependencies, on top of local contextual information of point clouds and the objects they describe. Self-attention is defined as:
 
 $$\text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
 
