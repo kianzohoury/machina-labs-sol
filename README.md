@@ -220,7 +220,7 @@ The architecture for the point completion model consists of an encoder, decoder,
 The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could solely focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct point embeddings.
 
 <p align="center">
-  <img src="docs/denoisertransformer.png" alt="Image 1" width="30%" />
+  <img src="docs/denoisertransformer.png" alt="Image 1" width="35%" />
 </p>
 
 
