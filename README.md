@@ -205,9 +205,16 @@ The architecture that I chose leverages transformers as they are highly adaptabl
 
 $$\text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
 
-where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$ are learnable model parameters that generate the attention scores for each self-attention mechanism.
+where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$ are learnable model parameters that are used in the computation of the attention output for each self-attention mechanism.
 
-More specifically, I designed an encoder-decoder model that uses...
+More specifically, I treated both denoising and point completion as a set-to-set translation problem, utilizing an encoder-decoder architecture. For both tasks, I felt it was necessary to include a decoder on top of an encoder, since sequence to sequence translation models use this architecture, and the general idea of an autoencoder is to utilize an encoder for feature extraction and a decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
+
+#### CompletionTransformer
+The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, given the local/global contextual information provided by the encoder at each corresponding layer.
+
+#### DenoisingTransformer
+The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could soley focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder.
+
 
 
 * explain why we can't use regular positional embeddings (non-discrete values)
