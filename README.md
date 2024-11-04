@@ -6,7 +6,7 @@
 
 
 <p align="center">
-  <img src="docs/ct1_table.png" alt="Image 1" width="50%" />
+  <img src="docs/ct1_table.png" alt="Image 1" width="75%" />
 </p>
 
 <p align="center">
