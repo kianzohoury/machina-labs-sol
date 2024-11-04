@@ -246,7 +246,7 @@ As mentioned in the data preparation section, I dynamically augmented the point 
 | Model  | noise strength (%) | points removed (%) |
 | :---------------- | :------: | :----: |
 | DenoiserTransformer     |   7.5   | 0     |
-| DenoiserTransformer   |       0   | 0   |
+| DenoiserTransformer   |       10   | 0   |
 | CompletionTransformer    |  0    | 25     |
 | CompletionTransformer   |  0    | 50   |
     
