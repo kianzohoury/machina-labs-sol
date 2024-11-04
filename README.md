@@ -358,7 +358,11 @@ It's always good practice to visualize your model performance during and after t
 
 ### Model Evaluation
 #### Test Performance
-The denoising and completion models were finally evaluated on a hold-out test set and the results are shown below:
+To get the final evaluations of the denoising/point completion models, we simply have to run the following command:
+```bash
+python evaluate.py --model_dir ./checkpoints
+```
+and by default, the test results are saved locally to `./test_results.csv`. The models were evaluated on a hold-out test set and the results are shown below:
 
 |   | Model                   | Noise Amount | Removal Ratio | Avg Chamfer Dist | Avg Chamfer Dist Baseline |
 |---|--------------------------|--------------|---------------|------------------|---------------------------|
