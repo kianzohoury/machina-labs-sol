@@ -5,6 +5,15 @@
 ### 310-508-1617
 
 
+<p align="center">
+  <img src="docs/ct1_table.png" alt="Image 1" width="50%" />
+</p>
+
+<p align="center">
+  <i>Predicted point cloud (right) given a partial point cloud (left), achieved by training a point completion model.</i>
+</p>
+
+
 ## Setup
 To get started, clone the repository:
 ```bash 
@@ -60,7 +69,7 @@ In order to load and work with the point cloud data as PyTorch tensors, I create
 In order to accomplish this, I did the following:
 * read `.json` metadata files containing the class labels and locations of their `.npy` files,
 * loaded `.npy` files as numpy arrays, changed point clouds from `XZY` to `XYZ` format (this was more of a convenience for plotting), and converted the data to tensors
-* applied several **pre-processing** and **data augmentation** steps for the denoising task, which I will describe next
+* applied several **pre-processing** and **data augmentation** steps for the denoising/completions tasks, which I will describe next
 
 #### **Pre-Processing**
 
