@@ -1,0 +1,3 @@
+[submodule "point-e"]
+	path = point-e
+	url = https://github.com/kianzohoury/point-e.git
