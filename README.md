@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <i>Predicted point cloud (right) given a partial point cloud (left), achieved by training a point completion model.</i>
+  <i>Predicted point cloud (right) given only partial information (middle) of the original (left), achieved by training a point completion model.</i>
 </p>
 
 
