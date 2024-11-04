@@ -340,6 +340,11 @@ It's always good practice to visualize your model performance during and after t
 #### Test Performance
 #### Visualizing Denoised/Completed Point Clouds
 
+<p align="center">
+  <img src="docs/denoise_chair_comp.png" alt="Image 1" width="60%" />
+  <img src="docs/denoise_plane_comp.png" alt="Image 2" width="70%" />
+  <img src="docs/denoise_cap_comp.png" alt="Image 3" width="60%" />
+</p>
 
 ## Task II: Generating Synthetic Defects with Diffusion Models
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
