@@ -73,9 +73,6 @@ class DenoiserTransformer(nn.Module):
         )
         
         # project back onto (x, y, z) to get estimated offset
-        offset = self.output_projection(decoded_point_embeddings)
-        
-        # subtract offset from initial point cloud to get the denoised points
-        output = point_cloud - offset
+        output = self.output_projection(decoded_point_embeddings)
         return output
     

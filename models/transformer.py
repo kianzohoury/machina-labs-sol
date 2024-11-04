@@ -126,7 +126,9 @@ class Decoder(nn.Module):
         """Generates final decoded representations for each predicted missing point."""
         
         # apply self attention to initial query embeddings
-        query_embeddings = self.self_attention(query_embeddings)        
+        skip = query_embeddings
+        query_embeddings = self.self_attention(query_embeddings)   
+        query_embeddings = self.layer_norm(query_embeddings + skip)
 
         # apply cross attention to drive processing of query embeddings using encoded features
         for i, decoder_layer in enumerate(self.decoder):
