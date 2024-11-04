@@ -345,12 +345,12 @@ which will save the denoising and point completion model checkpoints as `.pth` f
 
 It's always good practice to visualize your model performance during and after training. Usually, I will start with something like tensorboard because it is easy to integrate and track experiments, but I kept it simple for this assignment and just saved the per-epoch train and validation losses with `torch.save()`. Below, we can see the training and validation results of the four models:
 
-##### DenoiserTransformer Loss Curves
+##### DenoiserTransformer
 <p align="center">
-  <img src="docs/denoising_curves.png" alt="Image 2" width="70%" />
+  <img src="docs/denoiser_train_val_comp.png" alt="Image 2" width="70%" />
 </p>
 
-##### CompletionTransformer Loss Curves
+##### CompletionTransformer
 <p align="center">
   <img src="docs/completion_curves.png" alt="Image 2" width="70%" />
 </p>
