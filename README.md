@@ -320,11 +320,11 @@ It's always good practice to visualize your model performance during and after t
 
 ## Task II: Generating Synthetic Defects with Diffusion Models
 
-For this section, we will rely heavily on fine-tuning and evaluation of pre-trained models since training diffusion models from scratch are extremely costly. For the diffusion model, I decided to use [point-e by OpenAI](https://github.com/openai/point-e) and [] as a classifier to evaluate the effectiveness of synthetic point clouds for defect detection.
+For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
 
-As mentioned in the problem understanding section, training a robust defect detection system relies on having a rich and diverse distribution of defects, with many examples per defect category across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., we will constrain defects to simply mean point cloud deformities, such as noise and missing points. Initially, I had tried to model the "real" defects but found it quite tricky to implement without using meshes/normals of the data. In theory, if we could model the physical processes that generate these real-world defects, we could simply fine-tune a diffusion model to produce these as well.
+As mentioned in the problem understanding section, training a robust defect detection system relies on having a rich and diverse distribution of defects, with many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
 
-For the diffusion task, I generated a distribution of defective point clouds, sampling examples randomly from ShapeNetCore, applying the defect transformation, and generating text prompts using the example's class and appending the defect type, like so: `"<ShapeNet class> <defect type> defect"`. Like the denoising/point completion tasks, I generated defects by applying uniform/guassian noise and adopting a nearest neighbors approach to remove local sections of the point clouds. I sampled 1000 of these defective training examples and fine-tuned point-e by modifying scripts I found for fine-tuning from [this project](https://github.com/crockwell/Cap3D/tree/main). 
+For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying guassian noise or removing a connected section of points by sampling a random point and removing its neighbors. For the superivison signal (ground truth label) which the diffusion model is conditioned on, I generated simple text prompts by appending a given point clouds ShapeNet class label with a random defect type, in the following manner: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
 
 ### Defect Examples
 <p align="center">
@@ -343,48 +343,51 @@ For the diffusion task, I generated a distribution of defective point clouds, sa
 
 **text prompts**: *"cap noise defect", "lamp noise defect", "table noise defect"*
 
-One thing to note is that the diffusion model expected additional color channels, since it was trained on Objaverse data. In order to use point clouds from ShapeNet, I simply created dummy channels in order to correctly structure the last dimension, which holds $(x, y, z, r, g, b)$, where $r, g, b$ are the standard RGB color channels.
+One thing to note is that point-e generates point clouds with additional color channels, since it was trained on Objaverse data. In order to use point clouds from ShapeNetCore as ground truth labels, I created dummy color channels for the last dimension, which holds $(x, y, z, r, g, b)$, where $r, g, b$ are the standard RGB color channels. 
 
 ### Run Fine-tuning
-Please note that the following commands may take some time to run, since several pre-trained models will have to be downloaded first. To run fine-tuning on ShapeNetCore, `cd` into the parent directory of the project and run the following from the main entry point of the package:
+For fine-tuning point-e, I modified existing code from [this project](https://github.com/crockwell/Cap3D/tree/main). Mostly, I modified sections of code that allowed the model to be fine-tuned on data sourced from ShapeNetCore, with the transformations I wrote code for in Part I. Please note that the following commands may take some time to run, since several pre-trained models will have to be downloaded first. To run fine-tuning of the point-e diffusion model, change into the parent directory of the project (`cd ..`) and run the following from the main entry point of the package:
 ```bash
-python -m machina-labs.point-e.finetune_pointE --epoch 1 --defect_type removal --save_name removal_defect_diffusion
+python point-e.finetune_pointE --epoch 1 --defect_type removal --save_name removal_defect_diffusion
 ```
-which will fine-tune the pre-trained model (for a single epoch for testing purposes). If you would like to train the model for longer, specify the number of epochs with the `--epoch` argument. For simplicity, I kept the models separate with the `--defect_type` argument.
-### Optional: Download My Fine-tuned Model
-Otherwise, please download the model I fine-tuned by running the follow:
+Here, we're specifying fine-tuning for only one epoch, but we can train for more epochs using the `--epoch` argument. You can also specify the defect type to fine-tune the model on, using the `--defect_type` argument. For simplicity, I kept the models separate, but I believe it would be ideal to fine-tune a single model to generate different defect types.
+
+Model selection was carried out in the same fashion as Part I, where the best model was chosen based on its performance on a validation set.
+
+### Optional: Download My Fine-tuned Models
+To download the model checkpoints I trained previously, run the following commands:
 ```bash
-huggingface-cli download kianzohoury/shapenet_diffusion --filename removal_defect_diffusion.pth -o machina-labs/checkpoints
-huggingface-cli download kianzohoury/shapenet_diffusion --filename noise_defect_diffusion.pth -o machina-labs/checkpoints
+huggingface-cli download kianzohoury/shapenet_diffusion  --local-dir ./checkpoints
 ```
-which will save the models to the `machina-labs/checkpoints` directory.
+which will save the checkpoints as `.pth` files in the `machina-labs-sol/checkpoints` directory.
 
 ### Generating Synthetic Defective Point Clouds
-Once the model is downloaded, we can generate synthetic data by running the following:
+Running inference is also simple. Again, I had to make slight modifications to the original file, in order to handle the specific data I fine-tuned the diffusion model on. Once the model checkpoints are downloaded/created, we can generate synthetic defect data by running the following command:
 ```bash
-python -m machina-labs.point-e.text2ply_pointE --num_generate 5 --checkpoint ./machina-labs/checkpoints/removal_defect_diffusion.pth
+python -m machina-labs-sol.point-e.text2ply_pointE --num_generate 5 --checkpoint ./machina-labs-sol/checkpoints/removal_defect_diffusion.pth
 ```
-which will load the model checkpoint, e.g. `removal_defect_diffusion.pth`, generate 5 defective points cloud (much more can be generated as desired), and save them to the directory `machina-labs/synthetic_data`. Note that I unfortunately had to remove the upsample model, which increases the density/quality of the point clouds, since I could not download the necessary model checkpoint. Having such a model would likely increase the fidelity and in turn, realism of the defective point clouds for enhancing the training and robustness of downstream defect detection models.
+which will load the specified model checkpoint, e.g. `removal_defect_diffusion.pth`, generate the specified number of defective points cloud (5 in this case), and save them to the output directory `machina-labs-sol/synthetic_data`. Note that I unfortunately had to remove the upsample model, which increases the density/quality of the point clouds (by approximately a factor of 4), since I could not download the necessary model checkpoint. Having that additional model would likely increase the fidelity a bit and in turn, realism of the defective point clouds as well. 
 
 ### Visualizing/Assessing Realism of Synthetic Data
-Let's take a look at some of the synthetic defective point clouds generated from the fine-tuned diffusion model below:
+Let's take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
 
-#### Synthetic Removal Defects
+#### Synthetic "Removal/Incomplete" Defects
 <p align="center">
   <img src="docs/chair_removal_synthetic.png" alt="Image 1" width="20%" />
   <img src="docs/table_removal_synthetic.png" alt="Image 2" width="20%" />
   <img src="docs/laptop_removal_synthetic.png" alt="Image 3" width="26%" />
 </p>
 
-We see that the first two point clouds for the chair and table are quite deformed, missing structural pieces, while the third point cloud of a laptop has more structural integrity, but is missing clusters of points both of its flat surfaces. It seems that more fine-tuning is required to generate more realistic samples, but I did not run enough inference to conclusively say this model generates unrealistic incomplete point clouds.
+We see that the first two point clouds for the chair and table are quite deformed, missing structural pieces, while the third point cloud of a laptop has more structural integrity, but is missing clusters of points on both of its flat surfaces. I believe additional fine-tuning is required to generate more realistic samples, but I did not run enough inference to conclusively say this model generates completely unrealistic incomplete point clouds. 
 
-#### Synthetic Noise Defects
+#### Synthetic "Noise" Defects
 <p align="center">
   <img src="docs/airplane_synthetic_noise.png" alt="Image 1" width="20%" />
   <img src="docs/chair_synthetic_noise.png" alt="Image 2" width="20%" />
   <img src="docs/table_synthetic_noise.png" alt="Image 3" width="26%" />
 </p>
-Compared to the synthetic data with removal defects, the synthetic noisy samples are more coherent, interestingly enough. They are not as noisy as the original distribution the diffusion model was fine-tuned on, but they are noisy enough to be somewhat realistic and representative of actual laser-scanned data.
+Compared to the synthetic data with removal defects, the synthetic noisy samples are more coherent, interestingly enough. They are not as noisy as the original distribution the diffusion model was fine-tuned on, which again, is surprising, but perhaps not if you consider the "denoising" nature of diffusion models. Perhaps it's harder/takes longer to fine-tune the model to understand that noise is desired, in this case, and not noise that is removed from latent representations during the backward phase. Nevertheless, these examples are geometrically consistent but noisy enough to be somewhat realistic and possibly representative of real-world laser-scanned 3D data.
 
 ### Impact of Synthetic Data on Downstream Detection Models
-While I didn't get to this section due to running out of time, I would certainly have tried to first evaluate the effects of running a classification model like [PointNet](https://github.com/charlesq34/pointnet) on the synthetic data. For example, if the classification model fails to identify the classes corresponding to the synthetic data, we could argue that defects create uncertainty for the classification model, which is not explicitly trained on defective data. This uncertainty could be reduced if we additionally fine-tune the classification model. At first, the defects may be way out-of-distribution for the classification model, but as the defects become more "realistic" the classification model should better identify the correct class. This could be achieved using some form of adversarial/joint training of the diffusion model and classification/detection model. 
+While I did not make it to this section, I would have certainly tried to optimize the diffusion model more, in order to generate higher quality synethic, defective points clouds, and evaluated the effects they had on downstream classification/detection models. I would have likely started with [PointNet](https://github.com/charlesq34/pointnet), which could've led to some interesting insights about the quality of the synthetic data. 
+For example, if the PointNet classifier failed to identify the correct classes corresponding to the synthetic data, I would try to understand why/how the classifier was struggling. Because the classifier is not explicitly trained on defective data, it is expected that it will be exhibit higher uncertainty with defective point clouds, which are technically out-of-distribution. However, high uncertainty could mean that the defects are too extreme/unrealistic for the classifier to recognize the object's class. So, in some sense, if the defects are truly realistic, they would easily "fool" or pass as genuine instances of certain classes, according to the classifier. Instead of a classifier, we could also use a typical anomaly detection model (e.g. an autoencoder). If the synthetic defective point clouds have a reconstruction error below the acceptable threshold, then in some sense, they are of the same distribution as the original/nominal point clouds.
