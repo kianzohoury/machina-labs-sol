@@ -241,12 +241,12 @@ $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising/point completion model.
 
 #### **Experimental Setup**
-As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.075, 0.1$ and $r=0.25, 0.5$:
+As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.05, 0.075$ and $r=0.25, 0.5$:
 
 | Model  | noise strength (%) | points removed (%) |
 | :---------------- | :------: | :----: |
-| DenoiserTransformer     |   7.5   | 0     |
-| DenoiserTransformer   |       10   | 0   |
+| DenoiserTransformer     |   5.0   | 0     |
+| DenoiserTransformer   |       7.5   | 0   |
 | CompletionTransformer    |  0    | 25     |
 | CompletionTransformer   |  0    | 50   |
     
