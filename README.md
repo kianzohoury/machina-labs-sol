@@ -362,6 +362,8 @@ The denoising and completion models were finally evaluated on a hold-out test se
 
 
 #### Visualizing Denoised/Completed Point Clouds
+
+##### Denoising
 The following images are generated from the same test set with the model trained on 7.5% noise:
 
 <p align="center">
@@ -386,6 +388,8 @@ The following images are generated from the same test set with the model trained
   <img src="docs/d1_cap.png" alt="Image 1" width="70%" />
 </p>
 
+##### Completion
+The following images are generated from the same test set with the model trained on 7.5% noise:
 
 ## Task II: Generating Synthetic Defects with Diffusion Models
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
