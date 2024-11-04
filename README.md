@@ -365,25 +365,25 @@ The denoising and completion models were finally evaluated on a hold-out test se
 The following images are generated from the same test set with the model trained on 7.5% noise:
 
 <p align="center">
-  <img src="docs/d1_chair_1.png" alt="Image 1" width="50%" />
+  <img src="docs/d1_chair_1.png" alt="Image 1" width="60%" />
 </p>
 <p align="center">
-  <img src="docs/d1_chair_2.png" alt="Image 1" width="60%" />
+  <img src="docs/d1_chair_2.png" alt="Image 1" width="70%" />
 </p>
 <p align="center">
-  <img src="docs/d1_chair_3.png" alt="Image 1" width="60%" />
+  <img src="docs/d1_chair_3.png" alt="Image 1" width="70%" />
 </p>
 <p align="center">
-  <img src="docs/d1_table_1.png" alt="Image 1" width="50%" />
+  <img src="docs/d1_table_1.png" alt="Image 1" width="60%" />
 </p>
 <p align="center">
-  <img src="docs/d1_plane.png" alt="Image 1" width="60%" />
+  <img src="docs/d1_plane.png" alt="Image 1" width="70%" />
 </p>
 <p align="center">
-  <img src="docs/d1_car.png" alt="Image 1" width="60%" />
+  <img src="docs/d1_car.png" alt="Image 1" width="70%" />
 </p>
 <p align="center">
-  <img src="docs/d1_cap.png" alt="Image 1" width="60%" />
+  <img src="docs/d1_cap.png" alt="Image 1" width="70%" />
 </p>
 
 
