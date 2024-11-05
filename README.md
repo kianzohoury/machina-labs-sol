@@ -436,7 +436,7 @@ For this section, I relied on a pre-trained conditional text-to-3D diffusion mod
 
 As mentioned in the problem understanding section, training a robust defect detection system requires having a rich and diverse distribution of defects, with potentially many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
 
-For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying guassian noise or removing a connected section of points by sampling a random point and removing its neighbors. For the model inputs which the model is conditioned on, I generated simple text prompts by appending ShapeNetCore class labels with random defect types, in the following manner: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
+For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying noise or removing a region of points. The diffusion model's inputs were generated with simple text prompts with the following form: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
 
 ### Defect Examples
 <p align="center">
@@ -445,7 +445,9 @@ For the fine-tuning task, I generated a distribution of training data, which con
   <img src="docs/table_defect.png" alt="Image 3" width="25%" />
 </p>
 
-**text prompts**: *"airplane removal defect", "chair removal defect", "table removal defect"*
+<p align="center">
+  <i> text prompts: *"airplane removal defect", "chair removal defect", "table removal defect"<i/>
+</p>
 
 <p align="center">
   <img src="docs/cap_noise_defect.png" alt="Image 1" width="20%" />
@@ -453,7 +455,9 @@ For the fine-tuning task, I generated a distribution of training data, which con
   <img src="docs/table_noise_defect.png" alt="Image 3" width="26%" />
 </p>
 
-**text prompts**: *"cap noise defect", "lamp noise defect", "table noise defect"*
+<p align="center">
+  <i> "cap noise defect", "lamp noise defect", "table noise defect"<i/>
+</p>
 
 One thing to note is that point-e generates point clouds with additional color channels, since it was trained on Objaverse data. In order to use point clouds from ShapeNetCore as ground truth labels, I created dummy color channels for the last dimension, which holds $(x, y, z, r, g, b)$, where $r, g, b$ are the standard RGB color channels. 
 
