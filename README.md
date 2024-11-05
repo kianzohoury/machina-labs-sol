@@ -64,8 +64,8 @@ In order to create robust defect detection models, we need to generate large qua
 The dataset I chose for solving the three outlined problems is called **ShapeNetCore**, which is a subset of ShapeNet. It contains 16 popular classes of objects as point clouds. There are a few other datasets I could've used, but ultimately decided on ShapeNetCore due to pragmatism -- I was able to download it instantly from Kaggle, while the full ShapeNet and ModelNet40 required submitting email requests to download, and I needed to get to work quickly. However, I still believe the models I've trained on this dataset could easily be transferred to real-world data scanned from metal parts, as it has a reasonably diverse range of object geometries.
 
 <p align="center">
-  <img src="docs/class_distribution_bar.png" alt="Image 99" width="40%" />
-  <img src="docs/table_2048.png" alt="Image 99" width="25%" />
+  <img src="docs/class_distribution_bar.png" alt="Image 99" width="60%" />
+  <img src="docs/table_2048.png" alt="Image 99" width="30%" />
 </p>
 
 <p align="center">
