@@ -278,7 +278,7 @@ which runs evaluation on an unseen test set derived from the test split of Shape
 | 2 | denoiser_transformer_1   | 0.075        | 0.00          | 0.003186         | 0.007781                  | 59.05         |
 | 3 | denoiser_transformer_2   | 0.050        | 0.00          | 0.002601         | 0.004487                  | 42.03         |
 
-We see that `CompletionTransformer` with $50\%$ missing data had a $96.83\%$ reduction in the average Chamfer distance. In fact, all four of the models significantly improved over the baseline performance, which is expected. However, the reductions in Chamfer distance are significant, indicating that the models I designed perform well in their associated tasks.
+We see that `CompletionTransformer` with 50% missing data had a 96.83% reduction in the average Chamfer distance. In fact, all four of the models significantly improved over the baseline performance, which is expected. However, the reductions in Chamfer distance are significant, indicating that the models I designed perform well in their associated tasks.
 
 ### Visualizing Denoised & Completed Point Clouds
 The following images were generated from the same hold-out test set by `DenoiserTransformer` trained on 7.5% gaussian noise:
