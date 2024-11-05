@@ -508,9 +508,20 @@ The training and validation losses are shown below:
 <p align="center">
   <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="70%" />
 </p>
+
+<p align="center">
+  <i> Defect detection performance trained on synthetic 5% gaussian noise defects.</i>
+</p>
+
+
 <p align="center">
   <img src="docs/train_val_detector_removal.png" alt="Image 2" width="70%" />
 </p>
+
+<p align="center">
+  <i> Defect detection performance trained on synthetic 25% removal defects.</i>
+</p>
+
 
 which indicates that the models were able to be trained on synthetic data. The following table summarizes the test results, which show the detection models' performances on "real" defect point clouds:
 
