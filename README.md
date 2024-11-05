@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <i>Predicted point cloud (right) given only partial information (middle) of the original (left), achieved by training a point completion model.</i>
+  <i>Predicted point clouds (top) given only partial or noisy point clouds (bottom), achieved by training point cloud denoising and completion models.</i>
 </p>
 
 ## Table of Contents
