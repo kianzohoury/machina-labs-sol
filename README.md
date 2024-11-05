@@ -200,7 +200,7 @@ The goal of the query generator module, is to generate an initial set of point e
   <img src="docs/completiontransformer.png" alt="Image 1" width="50%" />
 </p>
 
-Note that the diagram is simplified, but each self-attention/cross-attention module follows the standard transformer recipe, with residual layers, layer normalization, and feed-forward layers.
+Note that the diagram is simplified, but each self-attention/cross-attention module follows the standard transformer recipe with multiple heads, residual layers, layer normalization, and feed-forward layers.
 
 #### DenoiserTransformer
 The architecture for the denoising model `models.denoiser.DenoiserTransformer` is similar, minus the additional module for generating new points. For this reason, I contemplated using just an encoder, but found it was better to incorporate a decoder, as it splits up the computation for the encoder. That is the encoder solely focuses on extracting rich contextual features, while the decoder focuses on reconstructing the set of points, given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct points.
