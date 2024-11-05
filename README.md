@@ -49,15 +49,15 @@
     - [Cross Validation & Early Stopping](#cross-validation--early-stopping)
     - [Random Seeds & Deterministic Augmentations](#random-seeds--deterministic-augmentations)
     - [Baseline Comparison](#baseline-comparison)
-    - [Run Training](#run-training)
-    - [Optional: Download My Trained Models](#optional-download-my-trained-models) -->
+    - [Run Training](#run-training) -->
+  - [Download My Trained Models](#download-my-trained-models)
   - [Loss Curves](#loss-curves)
   - [Test Performance](#test-performance)
   - [Visualizing Denoised & Completed Point Clouds](#visualizing-denoised--completed-point-clouds)
 - [Part II: Generating Synthetic Defects with Diffusion Models](#task-ii-generating-synthetic-defects-with-diffusion-models)
   - [Defect Examples](#defect-examples)
   - [Run Fine-tuning](#run-fine-tuning)
-  - [Optional: Download My Fine-tuned Models](#optional-download-my-fine-tuned-models)
+  - [Download My Fine-tuned Models](#download-my-fine-tuned-models)
   - [Generating Synthetic Defective Point Clouds](#generating-synthetic-defective-point-clouds)
   - [Visualizing/Assessing Realism of Synthetic Data](#visualizingassessing-realism-of-synthetic-data)
     <!-- - [Synthetic "Removal/Incomplete" Defects](#synthetic-removalincomplete-defects)
@@ -173,39 +173,15 @@ Similar to how models are trained in the literature, I used *on-the-fly* data au
 
 
 ### Define Model Architecture
+The models I designed for both tasks share the same general encoder-decoder, transformer-based architecture. Compared to sequence-to-sequence translation models that typically use an encoder-decoder transformer structure, the models I designed are instead functionally similar to vanilla CNN autoencoders. Instead of treating input/output data as sequences and iteratively generating tokens (points) in an auto-regressive fashion (aka next token prediction), I formulated the problem as a set-to-set translation problem (with a fixed output length) with the goal of reconstructing/generating new sets of point given their input sets. Furthermore, instead of wanting to maximize the likelihood of a sequence of token predictions, we want to minimize the reconstruction error for some predicted output (i.e. a point set), which is more in line with autoencoders.
 
-The models I designed for both tasks share the same general encoder-decoder, transformer-based architecture. Compared with sequence-to-sequence translation models that typically use an encoder-decoder transformer structure, the models I designed are more
+Since point clouds are unordered by nature, it made sense to use transformers, as they are permutation-equivariant (underlying computations of features are independent of their absolute orderings) without the use of standard positional encodings. Not only are transformers extremely powerful and easy to scale, but also highly-suited for learning complex relationships and long-range, global dependencies between points in a set, via the self-attention mechanism:
 
+$$Attention(Q, K, V) = \text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
 
+where $\text{Q}$, $\text{K}$, and $\text{V}$ are called query, key, and value vectors, which are computed via matrix multiplication with learnable model parameters, i.e. $\text{Q} = QW^Q$, $\text{K} = KW^K$, and $\text{V} = VW^V$, where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$. Note that in our case, we will keep things simple and choose $d_{model} = d_k = d_v$. The underlying computation of the attention output for transformers allows each point to "attend" to all other points in a point set, and in this way, capture spatial/geometric relationships without explicitly computing things like relative distances or nearest neighbors (although encoding schemes that incorporate these can help boost performance as well).
 
-Yes, that’s correct. Encoder-decoder transformer architectures for point clouds are indeed more similar to vanilla CNN autoencoders than to autoregressive transformers. Here’s why:
-
-Non-Autoregressive Output: Like CNN autoencoders, point cloud transformers process the entire input as a whole and output a full set of points simultaneously. They aren’t generating one point at a time in a sequential, autoregressive fashion as transformers do for text generation or sequence-to-sequence tasks in NLP.
-
-Set-Based Encoding: The transformer encoder in point cloud models captures relationships among points within a cloud without requiring an inherent order (similar to CNNs, which treat the spatial arrangement in images as a grid rather than a sequence). This approach aligns more with CNNs, where feature maps capture spatial or relational structure rather than sequential dependencies.
-
-Permutation Invariance: Point cloud transformers, like CNNs, are designed to handle permutation-invariant data, which is critical for unordered data like point clouds. CNN autoencoders achieve this through spatial filters, while transformers achieve it through self-attention layers that relate points to each other independently of order.
-
-Reconstruction-Based Loss: The loss functions used in point cloud models, such as Chamfer Distance or Earth Mover’s Distance, resemble the reconstruction-based losses in CNN autoencoders (e.g., mean squared error) rather than token-based cross-entropy losses typical in autoregressive models.
-
-So, transformer-based point cloud models share much more in common with CNN-style autoencoders—focusing on capturing spatial or structural relationships rather than autoregressively generating ordered sequences.
-
-
-
-By nature, point clouds are unordered, so 
-
-
-For both tasks, I felt it was necessary to include a decoder on top of an encoder,  and the general idea of an autoencoder is to utilize an encoder for feature extraction and a decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
-
-
-
-that I chose leverages transformers as they are highly adaptable beyond natural language tasks, including vision and geometric data such as the types of data (i.e. point clouds) we're dealing with. The idea behind using transformers is two-fold: (1) they are extremely powerful and easy to scale, as we can increase the depth of the model with a single line of code in PyTorch; (2) and more importantly, they utilize self-attention, which is a highly important concept that allows the model to learn potentially global/long-range dependencies, on top of local contextual information of point clouds and the objects they describe. Self-attention is defined as:
-
-$$\text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
-
-where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$ are learnable model parameters that are used in the computation of the attention output for each self-attention mechanism.
-
-
+For both tasks, the general idea was to utilize the encoder for feature extraction and decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
 
 #### CompletionTransformer
 The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the local/global contextual information provided by the encoder at each corresponding layer.
@@ -289,7 +265,7 @@ python train.py --task denoising --dataset_ratio 0.1 --num_layers 4 --max_num_ep
 ```
 which will run the specific model training task (i.e. denoising or completion). The above justs tests the functionality of the training code, as it will only train the model for a maximum of 5 epochs using only 10% of the training set on a smaller model with just 4 encoder/decoder layers.
 
-### Optional: Download My Trained Models
+### Download My Trained Models
 To download the final model checkpoints I previously trained for this assignment, run the following commands:
 ```bash
 huggingface-cli download kianzohoury/shapenet_tasks --local-dir ./checkpoints
@@ -445,11 +421,11 @@ The following images were generated from the same hold-out test set by `Completi
 
 
 ## Part II: Generating Synthetic Defects with Diffusion Models
-For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
+For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly and unfeasible, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
 
-As mentioned in the problem understanding section, training a robust defect detection system relies on having a rich and diverse distribution of defects, with many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
+As mentioned in the problem understanding section, training a robust defect detection system requires having a rich and diverse distribution of defects, with potentially many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
 
-For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying guassian noise or removing a connected section of points by sampling a random point and removing its neighbors. For the superivison signal (ground truth label) which the diffusion model is conditioned on, I generated simple text prompts by appending a given point clouds ShapeNet class label with a random defect type, in the following manner: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
+For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying guassian noise or removing a connected section of points by sampling a random point and removing its neighbors. For the model inputs which the model is conditioned on, I generated simple text prompts by appending ShapeNetCore class labels with random defect types, in the following manner: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
 
 ### Defect Examples
 <p align="center">
@@ -471,7 +447,16 @@ For the fine-tuning task, I generated a distribution of training data, which con
 One thing to note is that point-e generates point clouds with additional color channels, since it was trained on Objaverse data. In order to use point clouds from ShapeNetCore as ground truth labels, I created dummy color channels for the last dimension, which holds $(x, y, z, r, g, b)$, where $r, g, b$ are the standard RGB color channels. 
 
 ### Run Fine-tuning
-For fine-tuning point-e, I modified existing code from [this project](https://github.com/crockwell/Cap3D/tree/main). Mostly, I modified sections of code that allowed the model to be fine-tuned on data sourced from ShapeNetCore, with the transformations I wrote code for in Part I. Please note that the following commands may take some time to run, since several pre-trained models will have to be downloaded first. To run fine-tuning of the point-e diffusion model, change into the parent directory of the project (`cd ..`) and run the following from the main entry point of the package:
+For fine-tuning point-e, I modified existing code from [this project](https://github.com/crockwell/Cap3D/tree/main). Mostly, I modified sections of code that allowed the model to be fine-tuned on data sourced from ShapeNetCore, with the transformations I wrote code for in Part I. Please note that the following commands may take some time to run, since several pre-trained models will have to be downloaded. 
+
+First, `cd` into point-e and run the following:
+```bash
+cd point-e
+pip install -e .
+cd ..
+```
+
+To run fine-tuning of the point-e diffusion model, change into the parent directory of the project (`cd ..`) and run the following from the main entry point of the package:
 ```bash
 python -m machina-labs-sol.point-e.finetune_pointE --epoch 1 --defect_type removal --save_name removal_defect_diffusion
 ```
@@ -479,7 +464,7 @@ Here, we're specifying fine-tuning for only one epoch, but we can train for more
 
 Model selection was carried out in the same fashion as Part I, where the best model was chosen based on its performance on a validation set.
 
-### Optional: Download My Fine-tuned Models
+### Download My Fine-tuned Models
 To download the model checkpoints I trained previously, run the following commands:
 ```bash
 huggingface-cli download kianzohoury/shapenet_diffusion  --local-dir ./checkpoints
