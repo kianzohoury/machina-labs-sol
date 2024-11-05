@@ -61,7 +61,7 @@ In order to create robust defect detection models, we need to generate large qua
 
 ## Dataset
 
-The dataset I chose for solving the three outlined problems is called **ShapeNetCore**, which is a subset of ShapeNet. It contains 16 popular classes of objects as point clouds. There are a few other datasets I could've used, but ultimately decided on ShapeNetCore due to pragmatism -- I was able to download it instantly from Kaggle, while the full ShapeNet and ModelNet40 required submitting email requests to download, and I needed to get to work quickly. However, I still believe the models I've trained on this dataset could easily be transferred to real-world data scanned from metal parts, as it has a reasonably diverse range of object geometries.
+The dataset I chose for solving the three outlined problems is called **ShapeNetCore**, which is a subset of ShapeNet. It contains 16 popular classes of objects as point clouds. There are a few other datasets I could've used, but ultimately decided on ShapeNetCore due to pragmatism -- I was able to download it instantly from Kaggle, while the full ShapeNet/ShapeNetCore and ModelNet40 required submitting email requests to download, and I needed to get to work quickly. However, I still believe the models I've trained on this dataset could easily be transferred to real-world data scanned from metal parts, as it has a reasonably diverse range of object geometries.
 
 <p align="center">
   <img src="docs/class_distribution_bar.png" alt="Image 99" width="45%" />
@@ -72,106 +72,45 @@ The dataset I chose for solving the three outlined problems is called **ShapeNet
   <i>Class distribution and example point cloud of a table with 2048 points.</i>
 </p>
 
-One limitation with the version of ShapeNetCore I downloaded is that the point clouds are fairly sparse (vs. dense point clouds with >= 10k points), presumably because they were already down-sampled. Larger point clouds equate to more computational load, but also better models, so the models I designed would likely be improved with richer point cloud sets.
+One limitation with the version of ShapeNetCore I downloaded from Kaggle is that the point clouds are fairly sparse (vs. dense point clouds with >= 10k points), presumably because they were already down-sampled. Larger point clouds equate to more computational load, but also better models, so the models I designed would likely be improved with richer point cloud sets.
 
-## Task I: Point Cloud Denoising & Completion
+## Part I: Point Cloud Denoising & Completion
 
-As outlined in the problem understanding section, the two main tasks are point cloud denoising and completion. For both tasks, we will use the same underlying source data, but we will augment/transform them differently based on the task that we are solving, and in order to create labeled training examples consisting of noisy/incomplete inputs and clean target point clouds.
+As outlined in the problem understanding section, the two primary tasks are point cloud denoising and completion, which will be the focus of Part I. For these tasks, I used the same underlying source data and applied data augmentations/corruptions in order to generate input examples for each specific task. 
 
 ### **Dataset Preparation**
 
-In order to load and work with the point cloud data as PyTorch tensors, I created the `ShapeNetCore` Dataset class, which was designed for loading examples from ShapeNetCore containing pairs of the form $(x, y)$, with $x$ being a noisy/incomplete version of the original/clean point cloud $y$.
+In order to load and work with the point cloud data as PyTorch tensors, I created the `dataset.ShapeNetCore` Dataset class, which was designed for creating labeled examples *on-the-fly* from ShapeNetCore, where each example pair  $(x, y)$ consists of a noisy or incomplete version $x$ of the original, clean point cloud $y$.
 
 In order to accomplish this, I did the following:
 * read `.json` metadata files containing the class labels and locations of their `.npy` files,
 * loaded `.npy` files as numpy arrays, changed point clouds from `XZY` to `XYZ` format (this was more of a convenience for plotting), and converted the data to tensors
 * applied several **pre-processing** and **data augmentation** steps for the denoising/completions tasks, which I will describe next
 
-#### **Pre-Processing**
+### **Pre-Processing**
 
-Pre-processing is extremely crucial in most deep learning problems, especially for computer vision. Fortunately, since the point clouds from ShapeNet are already clean (aka noise-free), the only pre-processing I had to do for them is **normalization** and **down/up-sampling**, due to the point clouds not being standardized when it comes to scale, nor in the density/number of points.
+Pre-processing is extremely crucial in most deep learning problems, especially for computer vision. Fortunately, since the point clouds from ShapeNetCore are already clean (aka noise-free), the only pre-processing I had to do was **normalization** and **down/up-sampling**, due to the point clouds not being standardized when it comes to scale, nor in the density/number of points.
 
-##### Normalization
-The reason it's crucial for each point cloud to fit within the same scale is because at test time, if a model recieves data on a different scale, it may generalize very poorly, so it's something we need to always think about. More importantly, when adding perturbations like noise for the denoising task, it's imperative that the randomly generated noise is also on the same scale, otherwise you get very weird looking point clouds (which I encountered before normalization).
-
-Below is a function that allows each point cloud to fit within the unit sphere (i.e. centered about the origin $\vec 0$ with a maximum vector norm $||x||_2 = 1$). For each point $x$, we normalize as follows:
-
+#### Normalization
+The reason it's crucial for each point cloud to fit within the same scale is because at test time, if a model recieves an input that is on a significantly different scale, it may generalize poorly. More importantly, when adding perturbations like noise for the denoising task, it's imperative that the randomly generated noise also matches the scale, otherwise the point clouds may get distorted/stretched along a certain dimension, which I encountered before applying input normalization. The `dataset.transform.normalize_point()` function normalizes a point cloud to fit within the unit sphere (i.e. centered about the origin $\vec 0$ with a maximum vector norm $||x||_2 = 1$), by doing the following:
 1. compute the mean of the point cloud: $\mu_{x} = \frac{1}{n}\sum_i^n x_i$
 2. compute the max norm of the point cloud: $x_{norm}$ = $\max_i ||x_i||_2$
 3. compute the normalized point cloud
 $\bar x = (x - \mu_x) / x_{norm}$
 
-```python
-def normalize_point_cloud(point_cloud: torch.Tensor) -> torch.Tensor:
-    """Normalize point cloud to be centered at origin and have max vector norm of 1."""
+#### Down-sampling
 
-    # find center (mean) of point cloud
-    mu = torch.mean(point_cloud, axis=0)
+Following data normalization, I down-sampled point clouds to have exactly 1024 points (initially, I set the maximum to 2048 points, but found 1024 to be good enough). This was done by uniform random sampling of point cloud indices to remove, using the `dataset.transform.remove_points()` function. However, other types of down-sampling like farthest point sampling would also work well. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller).
 
-    # find largest vector norm
-    max_norm = torch.max(torch.linalg.norm(point_cloud, axis=1))
+#### Zero Padding (fake up-sampling)
+For point clouds with fewer than the desired number of points (i.e. 1024), I applied zero-padding with the `dataset.transform.add_padding()` function, similar to how language modeling tasks require padding tokens for sentences of variable lengths. Furthermore, the PyTorch `DataLoader` expects tensors in a batch to have the exact same shape, so this was a necessary step. There are definitely other ways to up-sample point clouds, but I didn't want to potentially add noise to already clean ground truth point clouds.
 
-    # shift to be centered around origin and scale
-    point_cloud_normalized = (point_cloud - mu) / max_norm
-    return point_cloud_normalized
-```
+### **Data Augmentation**
 
-##### Down-sampling
+#### Denoising Task: Adding Noise
+To generate a noisy input $x$, I created the function `dataset.transform.add_noise()`, which randomly samples a noise vector $v_{noise} \sim \mathcal{N}(0, \epsilon)$ from a gaussian (or uniform distribution $U[-\epsilon, \epsilon]$, if specified), and perturbs the original point cloud $x = y + v_{noise}$. The amount of noise that is added is controlled by a parameter $\epsilon$. Increasing the value of $\epsilon$ makes it more challenging for the denoising model to recover the original signal. Of course, if the value is too high, the inputs will start to resemble noise more than the objects themselves, which may not even reflect the noise levels found in typical 3D scans. Nevertheless, it's worthwhile to push the model's denoising abilities by testing higher noise amounts.
 
-Following data normalization, I down-sampled the point clouds to initially a maximum of 2048 points, but later found 1024 to be easier to work with (due to computational constraints). This was done by simply uniformily random sampling indices of the point cloud array to remove from the whole point cloud. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller). This is done in the `__getitem__()` function of `ShapeNetCore`:
-```python
-# downsample to max_points if necessary
-if num_points > self.max_points:
-    # use uniform random sampling (quick & dirty)
-    if self.downsampling_mode == "uniform":
-        num_remove = max(0, num_points - self.max_points)
-        target_point_cloud = remove_points(
-            point_cloud=target_point_cloud, num_remove=num_remove
-        )
-    # could be used for different down-sampling techniques (e.g. farthest point)
-    else:
-        pass
-```
-##### Zero Padding (fake up-Sampling)
-For point clouds with fewer than the desired number of points (e.g. 1024), I applied zero-padding, similar to how language tasks require padding tokens for sentences of variable lengths. Furthermore, the PyTorch `DataLoader` expects tensors in a batch to have the exact same shape, so this is a necessary step. 
-```python
-def add_padding(point_cloud: torch.Tensor, max_points: int = 1024):
-    """Adds zero-padding aka zero vectors according to the desired size."""
-    num_pad = max_points - point_cloud.shape[0]
-    padding = torch.zeros((num_pad, 3))
-    padded_point_cloud = torch.cat([point_cloud, padding])
-    return padded_point_cloud
-```
-There are definitely other ways to up-sample point clouds, but I didn't want to potentially add noise to the ground truth labels (clean point clouds).
-
-#### **Data Augmentation**
-
-##### Denoising Task: Adding Noise
-The first agumentation is to randomly sample a noise vector from a normal distribution $\mathcal{N}(0, 1)$, or even a uniform distribution $U[0, 1]$. The amount of noise that is added is controlled by a parameter $\epsilon$, which is the standard deviation of the Gaussian, but also specifically translates to a ratio of the norm (i.e. $\epsilon=0.01 = 1\%$ of the norm as a distance). Increasing the strength of $\epsilon$ makes it more difficult for the denoising model to recover the original signal (due to information loss), and it should be obvious that adding too much noise will yield a poor performing model, as the inputs start to resemble noise more than the objects themselves, and may not even reflect how noisy 3D scans are in practice. Still, it's worthwhile to push the model's denoising abilities by testing higher noise amounts.
-
-For a given target point cloud $y \in \mathbb{R}^3$, we generate a noisy point cloud $x \in \mathbb{R}^3$:
-
-$$x = y + v_{noise}$$
-
-where $v_{noise} \sim \mathcal{N}(0, \epsilon)$. 
-
-```python
-def add_noise(
-    point_cloud: torch.Tensor,
-    noise_type: str = "uniform",
-    amount: float = 1e-2
-) -> torch.Tensor:
-    """Randomly perturbs clean point cloud with specified type of noise."""
-    if noise_type == "uniform":
-        random_noise = amount * (2 * torch.rand(size=point_cloud.shape) - 1)
-    elif noise_type == "gaussian":
-        random_noise = torch.normal(mean=0, std=amount, size=point_cloud.shape)
-    else:
-        random_noise = torch.zeros_like(point_cloud)
-    return point_cloud + random_noise
-```
-
-##### Point Completion Task: Removing Points
+#### Point Completion Task: Removing Points
 The second augmentation is to randomly remove points for the point completion task, similar to the down-sampling process described above, except we will do it in a more structured way. The ratio $r \in [0, 1)$ controls the number of points to remove from the point cloud, and so we can, for example, choose $r=0.25$, which will drop $25\%$ of the points, giving us an incomplete point cloud containing the remaining $75\%$ of the points. Initially, I had thought to remove the points in a uniform way to create a "sparse" point cloud, but decided to remove entire sections of the point cloud, which is how point completion tasks are typically formulated. For this, I randomly selected a point in the point cloud and removed an entire section via a nearest neighbors approach.
 ```python
 def remove_neighboring_points(point_cloud: torch.Tensor, num_remove: int):
