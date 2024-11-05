@@ -59,6 +59,6 @@ class Detector(nn.Module):
         pooled_features = encoder_features.mean(dim=1)
         
         # pass through classifier
-        logits = self.classifier(pooled_features)
+        logits = self.classifier(pooled_features).squeeze(-1)
         return logits
     

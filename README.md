@@ -446,7 +446,7 @@ For the fine-tuning task, I generated a distribution of training data, which con
 </p>
 
 <p align="center">
-  <i> text prompts: "airplane removal defect", "chair removal defect", "table removal defect"<i/>
+  <i> text prompts: "airplane removal defect", "chair removal defect", "table removal defect"</i>
 </p>
 
 <p align="center">
@@ -456,7 +456,7 @@ For the fine-tuning task, I generated a distribution of training data, which con
 </p>
 
 <p align="center">
-  <i> text prompts: "cap noise defect", "lamp noise defect", "table noise defect"<i/>
+  <i> text prompts: "cap noise defect", "lamp noise defect", "table noise defect"</i>
 </p>
 
 One thing to note is that point-e generates point clouds with additional color channels, since it was trained on Objaverse data. In order to use point clouds from ShapeNetCore as ground truth labels, I created dummy color channels for the last dimension, which holds $(x, y, z, r, g, b)$, where $r, g, b$ are the standard RGB color channels. 
