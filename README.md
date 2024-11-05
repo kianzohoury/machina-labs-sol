@@ -203,18 +203,18 @@ For `DenoiserTransformer` and `CompletionTransformer`, I investigated $\epsilon 
 #### Hyperparameters
 The hyperparameters for training the models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments.
 
-* learning rate: $1e-4$
-* warmup ratio: $0.1$
-* early stopping patience (in epochs): $10$
-* batch size: $16$ x number of GPUs
-* max number of epochs: $100$
-* number of dataloader processes/workers: $8$
-* max number of points per point cloud: $1024$
-* number of encoder/decoder layers: $8$
-* number of self-attention/cross-attention heads per layer: $8$
-* dropout: $0.1$
-* embedding & K, Q, V vector dimension: $256$
-* dataset ratio (portion of training set): $1$ 
+* learning rate: 1e-4
+* warmup ratio: 0.1
+* early stopping patience (in epochs): 10
+* batch size: 16 x number of GPUs
+* max number of epochs: 100
+* number of dataloader processes/workers: 8
+* max number of points per point cloud: 1024
+* number of encoder/decoder layers: 8
+* number of self-attention/cross-attention heads per layer: 8
+* dropout: 0.1
+* embedding & K, Q, V vector dimension: 256
+* dataset ratio (portion of training set): 1.0
 
 #### Optimization
 For optimization, I chose AdamW (with default parameters) as it's a powerful adaptive, momentum-based gradient descent optimization method that is typically very effective for training larger, transformer-based models. I also decided to use learning rate scheduling as it also (in my experience) improves training stability for transformer models. I used a linear schedule for the first 10% of training steps (10 epochs) to warmup the model and a cosine annealing schedule for the remaining 90% of training steps (90 epochs). I found that the warmups were essential for stable training in the initial stages, otherwise the models had trouble learning at all.
