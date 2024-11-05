@@ -102,7 +102,7 @@ def normalize_point_cloud(point_cloud: torch.Tensor) -> torch.Tensor:
 
 ##### Down-sampling
 
-Following data normalization, I down-sampled the point clouds to initially a maximum of 2048 points, but later found 1024 to be easier to work with (due to computational constraints). This was done by simply uniformily random sampling indices of the point cloud array to remove from the whole point cloud. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller). This is done in the `__getitem__` function of `NoisyShapeNetCore`:
+Following data normalization, I down-sampled the point clouds to initially a maximum of 2048 points, but later found 1024 to be easier to work with (due to computational constraints). This was done by simply uniformily random sampling indices of the point cloud array to remove from the whole point cloud. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller). This is done in the `__getitem__()` function of `NoisyShapeNetCore`:
 ```python
 # downsample to max_points if necessary
 if num_points > self.max_points:
@@ -116,6 +116,17 @@ if num_points > self.max_points:
     else:
         pass
 ```
+##### Zero Padding (fake up-Sampling)
+For point clouds with fewer than the desired number of points (e.g. 1024), I applied zero-padding, similar to how language tasks require padding tokens for sentences of variable lengths. Furthermore, the PyTorch `DataLoader` expects tensors in a batch to have the exact same shape, so this is a necessary step. 
+```python
+def add_padding(point_cloud: torch.Tensor, max_points: int = 1024):
+    """Adds zero-padding aka zero vectors according to the desired size."""
+    num_pad = max_points - point_cloud.shape[0]
+    padding = torch.zeros((num_pad, 3))
+    padded_point_cloud = torch.cat([point_cloud, padding])
+    return padded_point_cloud
+```
+There are definitely other ways to up-sample point clouds, but I didn't want to potentially add noise to the ground truth labels (clean point clouds).
 
 #### **Data Augmentation**
 
@@ -168,32 +179,19 @@ def remove_neighboring_points(point_cloud: torch.Tensor, num_remove: int):
 ```
 
 ##### On-The-Fly Data Augmentation
-Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy/incomplete point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for large transformer-based models. It's entirely plausible that an overparameterized model may memorize how to denoise a particular point cloud, if it always presents the same noise pattern. 
+Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy/incomplete point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for large transformer-based models. It's entirely plausible that an overparameterized model may memorize how to denoise a particular point cloud, if it always presents the same noise pattern. During a given training epoch, each point cloud $x$ will receive a slightly different, random transformation, achieved by implementing a `RandomTransform` class, ensuring that no transformation is identical across epochs. 
 
-More specifcially, during a given training iteration, each point cloud $x_i$ will receieve a random transformation while the ground truth point cloud will remain clean. So for any given training epoch (one pass over the full batch of the training set), the noisy version of a point cloud is never identical. To accomplish this, I defined a `RandomTransform` class and had to ensure the seeds were set correctly for data loading, which I will describe in the training section.
+Initially, when I was considering combining the two tasks, I was chaining together the `remove_points()` and `add_noise()` functions, which were assigned simple probabilities like $\text{Pr}(\text{add noise}) = \text{Pr}(\text{remove points}) = 0.25$ and $\text{Pr}(\text{both})=0.5$. However, I later decided to only apply the task-specific transformations as it simplified the learning task and design for each model.
 
-Essentially, when called `RandomTransform` augments a point cloud, by first removing points according to the ratio $r$, and then adding noise according to $\epsilon$. However, the augmentations are done probabilistically, with a probability of applying both transformations as $\text{Pr}(\text{both})$. If only one augmentation is applied, the functions `remove_points()` and `add_noise()` have equal probability of being called.
 
-In short, with $\text{Pr}(\text{both})=0.5$, roughly $50\%$ of the point clouds will receieve both augmentations, which means that $\text{Pr}(\text{add noise}) = \text{Pr}(\text{remove points}) = 0.25$. The `RandomTransform` class is very convenient, as it allows us to generate a specific kind of data distribution for each model we wish to train.
 
-One additional thing to note is that once points are removed from a point cloud, you will point clouds of different sizes (i.e. number of points). The PyTorch `DataLoader` will have issues with this, since it expects each example in the batch to have the same shape. Moreover, similar to language tasks where sentences can be of different lengths, we need to zero-pad the point clouds. I defined a very simple function `add_padding()`, which appends zero vectors to the point cloud. On the surface, it may seem detrimental to the denoising task, but as I will describe shortly, we can bypass our denoising model from learning features associated with these redundant padding vectors via masking.
-
-```python
-def add_padding(point_cloud: torch.Tensor, max_points: int = 1024):
-    """Adds zero-padding aka zero vectors according to the desired size."""
-    num_pad = max_points - point_cloud.shape[0]
-    padding = torch.zeros((num_pad, 3))
-    padded_point_cloud = torch.cat([point_cloud, padding])
-    return padded_point_cloud
-```
 
 ##### Optional: Rotations
-
-In theory, this should also help increase the denoising model's robustness to objects in different spatial orientations. Without going into exact details, I randomly sampled an angle $a \in [0, 2\pi]$ for rotation along $z$-axis. The rotated point cloud is achieved using the following matrix multiplication: 
+I also randomly applied $z$-axis rotations to point clouds in order for the models to see objects in different spatial orientations. Given an angle $a \in [0, 2\pi]$, the point clouds were rotated using a $3 \times 3$ rotation matrix $\mathrm{M_z}$: 
 
 $$x_{rot} = x\mathrm{M_{z}^{T}}$$
 
-Note that we have to transpose the $3 \times 3$ rotation matrix because it assumes column vector orientation, but we're dealing with point clouds that contain row vectors.
+Note that we have to transpose the matrix because it assumes column vector orientation, but we're dealing with tensors that contain row vectors.
 
 ```python
 def rotate_z_axis(point_cloud: torch.Tensor) -> torch.Tensor:
