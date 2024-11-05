@@ -119,16 +119,14 @@ if num_points > self.max_points:
 
 #### **Data Augmentation**
 
-There is a series of data augmentation steps I took in order to curate the dataset for denoising/point completion. I will describe each function and then show how they are combined to generate noisy point clouds for training and evaluation on ShapeNetCore.
+##### Denoising Task: Adding Noise
+The first agumentation is to randomly sample a noise vector from a normal distribution $\mathcal{N}(0, 1)$, or even a uniform distribution $U[0, 1]$. The amount of noise that is added is controlled by a parameter $\epsilon$, which is the standard deviation of the Gaussian, but also specifically translates to a ratio of the norm (i.e. $\epsilon=0.01 = 1\%$ of the norm as a distance). Increasing the strength of $\epsilon$ makes it more difficult for the denoising model to recover the original signal (due to information loss), and it should be obvious that adding too much noise will yield a poor performing model, as the inputs start to resemble noise more than the objects themselves, and may not even reflect how noisy 3D scans are in practice. Still, it's worthwhile to push the model's denoising abilities by testing higher noise amounts.
 
-##### Adding Noise
-The first agumentation is to randomly sample a noise vector from a normal distribution $\mathcal{N}(0, 1)$. The reasoning behind sampling noise from a Gaussian instead of a uniform distribution, is because it is *probably* (though I'm not certain on this) more realistic to how sensors receive noisy signals; however, other techniques of adding noise would likely also work pretty well and generate differently capable denoising models. The amount of noise that is added is controlled by a parameter $\epsilon$, which is the standard deviation of the Gaussian, but also specifically translates to a ratio of the norm (i.e. $\epsilon=0.01 = 1\%$ of the norm as a distance). Also, it's important to note that randomly sampling prevents the model from fitting to certain noise patterns, which is definitely not what we want our model to learn to solve. Increasing the strength of $\epsilon$ helps to also strengthen the model's denoising ability/robustness, but it should also be obvious that adding too much noise makes it very hard for a model to perform well, as the inputs start to become noise themselves, and may not even reflect the data seen in practice.
-
-The process is as follows. For a given target point cloud $y$, we generate a noisy point cloud $x$:
+For a given target point cloud $y \in \mathbb{R}^3$, we generate a noisy point cloud $x \in \mathbb{R}^3$:
 
 $$x = y + v_{noise}$$
 
-where $v_{noise} \sim \mathcal{N}(0, \epsilon)$. Note that all these vectors live in the same space (i.e. $\mathbb{R}^3$).
+where $v_{noise} \sim \mathcal{N}(0, \epsilon)$. 
 
 ```python
 def add_noise(
@@ -146,8 +144,8 @@ def add_noise(
     return point_cloud + random_noise
 ```
 
-##### Removing Points
-The second augmentation is to randomly remove points for the point completion task, similar to the down-sampling process described above, except we will do it in a more structured way. The ratio $r \in [0, 1)$ controls the number of points to remove from the point cloud, and so we can, for example, choose $r=0.25$, which will drop $25\%$ of the points, giving us an incomplete point cloud containing the remaining $75\%$ of the points. Initially, I had thought to remove the points in a uniform way to create a "sparse" point cloud, but decided to remove entire sections of the point cloud, which is how point completion tasks are typically formulated. For this, I randomly selected a point in the point cloud and removed an entire section via nearest neighbors.
+##### Point Completion Task: Removing Points
+The second augmentation is to randomly remove points for the point completion task, similar to the down-sampling process described above, except we will do it in a more structured way. The ratio $r \in [0, 1)$ controls the number of points to remove from the point cloud, and so we can, for example, choose $r=0.25$, which will drop $25\%$ of the points, giving us an incomplete point cloud containing the remaining $75\%$ of the points. Initially, I had thought to remove the points in a uniform way to create a "sparse" point cloud, but decided to remove entire sections of the point cloud, which is how point completion tasks are typically formulated. For this, I randomly selected a point in the point cloud and removed an entire section via a nearest neighbors approach.
 ```python
 def remove_neighboring_points(point_cloud: torch.Tensor, num_remove: int):
     """Removes a local section of points by remove the nearest neighbors starting 
@@ -170,7 +168,7 @@ def remove_neighboring_points(point_cloud: torch.Tensor, num_remove: int):
 ```
 
 ##### On-The-Fly Data Augmentation
-Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for large transformer-based models. It could be very easy to memorize how to denoise a given point cloud, if it always is present with the same noise pattern. So this type of data "sampling", if you will, ensures robustness and generalizability of the denoising model, since it will always see a slightly different noise pattern for each point cloud.
+Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy/incomplete point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for large transformer-based models. It's entirely plausible that an overparameterized model may memorize how to denoise a particular point cloud, if it always presents the same noise pattern. 
 
 More specifcially, during a given training iteration, each point cloud $x_i$ will receieve a random transformation while the ground truth point cloud will remain clean. So for any given training epoch (one pass over the full batch of the training set), the noisy version of a point cloud is never identical. To accomplish this, I defined a `RandomTransform` class and had to ensure the seeds were set correctly for data loading, which I will describe in the training section.
 
