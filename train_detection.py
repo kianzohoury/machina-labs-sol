@@ -6,11 +6,13 @@ from typing import Any
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import ConcatDataset, DataLoader, Subset, random_split
 
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from dataset.transform import RandomTransform
+from dataset.shapenetcore import ShapeNetCore, ShapeNetCoreDefectDetection
 from dataset.synthetic import SyntheticDefectData
 from models.detection import Detector
 from train import LRScheduler
@@ -20,8 +22,8 @@ NUM_GPUS = torch.cuda.device_count()
 print(f"Number of GPUs available: {NUM_GPUS}")
 
 # default hyperparameters
-LR = 1e-4
-PATIENCE = 10
+LR = 1e-5
+PATIENCE = 20
 WARMUP_RATIO = 0.1
 BATCH_SIZE = 16 * NUM_GPUS or 1 # in case a GPU is not available
 MAX_NUM_EPOCHS = 100
@@ -61,7 +63,6 @@ def train_epoch(
             # run forward pass
             y_pred = model(x)
 
-            
             # compute loss
             loss = nn.functional.binary_cross_entropy_with_logits(
                 input=y_pred, target=y_true
@@ -98,6 +99,8 @@ def validate_epoch(
     max_batches = min(len(dataloader), max_batches)
     device = list(model.parameters())[0].device
     total_loss = 0
+    num_correct = 0
+    num_total = 0
 
     model.eval()
     with torch.no_grad():
@@ -119,14 +122,22 @@ def validate_epoch(
                     input=y_pred, target=y_true
                 )
                 total_loss += loss.item()
-
+                
+                # count number of correct predictions
+                y_pred_prob = nn.functional.sigmoid(y_pred)
+                num_correct += (torch.where(y_pred_prob >= 0.5, 1, 0) == y_true).sum().item()
+                num_total += x.shape[0]
+                
                 # display loss via logger
                 mean_loss = total_loss / (batch_idx + 1)
-                tq.set_postfix({"mean_loss": round(mean_loss, 7)})
+                tq.set_postfix(
+                    {"mean_loss": round(mean_loss, 7), "acc": round(num_correct / num_total, 6)}
+                )
 
                 if batch_idx == max_batches:
                     break
     mean_loss = total_loss / len(dataloader)
+    print(f"Final accuracy: {num_correct / num_total}")
     return mean_loss
 
 
@@ -145,8 +156,70 @@ def train(args):
     tb_writer = SummaryWriter()
 
     # create datasets
-    train_data = SyntheticDefectData(root="synthetic_data")
-    train_data, val_data = random_split(train_data, [0.8, 0.2])
+    synthetic_defect_data = SyntheticDefectData(
+        root="synthetic_data", 
+        defect_type="removal" if args.task == "completion" else "noise"
+    )
+    num_synthetic_defects = len(synthetic_defect_data)
+    
+    # get nominal point clouds
+    input_transform = RandomTransform(
+        removal_amount=0.25, 
+        noise_amount=0.05,
+        task=args.task
+    )
+
+    # train on defects and nominals
+    real_defect_data_train = ShapeNetCoreDefectDetection(
+        root="Shapenetcore_benchmark",
+        split="train",
+        max_points=1365 if args.task == "completion" else 1024,
+        input_transform=input_transform
+    )
+    real_nominal_data_train = ShapeNetCoreDefectDetection(
+        root="Shapenetcore_benchmark",
+        split="train",
+        max_points=1024,
+        input_transform=None
+    )
+    
+    # aggregate train datasets
+    real_defect_train_indices = torch.randperm(len(real_defect_data_train))[:num_synthetic_defects // 2]
+    real_nominal_train_indices = torch.randperm(len(real_nominal_data_train))[:num_synthetic_defects // 2]
+    
+    real_defect_train_subset = Subset(real_defect_data_train, indices=real_defect_train_indices)
+    real_nominal_train_subset = Subset(real_nominal_data_train, indices=real_nominal_train_indices)
+    train_data = ConcatDataset([real_defect_train_subset, real_nominal_train_subset, synthetic_defect_data])
+    
+    # test on defects and nominals
+    real_defect_data_test = ShapeNetCoreDefectDetection(
+        root="Shapenetcore_benchmark",
+        split="test",
+        max_points=1365 if args.task == "completion" else 1024,
+        input_transform=input_transform
+    )
+    real_nominal_data_test = ShapeNetCoreDefectDetection(
+        root="Shapenetcore_benchmark",
+        split="test",
+        max_points=1365 if args.task == "completion" else 1024,
+        input_transform=None
+    )
+    
+    # aggregate test datasets
+    real_defect_test_indices = torch.randperm(len(real_defect_data_test))
+    real_nominal_test_indices = torch.randperm(len(real_nominal_data_test))
+    
+    real_defect_test_subset = Subset(real_defect_data_train, indices=real_defect_test_indices)
+    real_nominal_test_subset = Subset(real_nominal_data_train, indices=real_nominal_test_indices)
+    test_data = ConcatDataset([real_defect_test_subset, real_nominal_test_subset])
+    
+    print(
+        f"Total number of examples: {len(train_data)}, synthetic: {num_synthetic_defects}, "
+        f"real: {len(train_data) - num_synthetic_defects}"
+    )
+    
+    # get train-val split
+    train_data, val_data = random_split(train_data, [0.5, 0.5])
     
     # wrap datasets into data loaders
     train_loader = DataLoader(
@@ -162,6 +235,13 @@ def train(args):
         shuffle=True,
         num_workers=args.num_workers,
         pin_memory=True,
+    )
+    test_loader = DataLoader(
+        dataset=test_data,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=True
     )
 
     # instantiate model and push to device
@@ -244,7 +324,7 @@ def train(args):
                     "epoch": epoch,
                     **args.__dict__
                 }, 
-                f=f"{args.root}/checkpoints/{model_name}.pth"
+                f=f"{args.root}/checkpoints/{model_name}_{args.task}.pth"
             )
             
             print("Best model saved.")
@@ -258,6 +338,11 @@ def train(args):
                 print("Stopping training early.")
                 break
     print("Training complete.\n")
+    
+    # evaluate model on test data
+    state_dict = torch.load(f"{args.root}/checkpoints/{model_name}_{args.task}.pth")
+    model.load_state_dict(state_dict["model"])
+    validate_epoch(model=model, dataloader=test_loader)
         
             
 def main():
@@ -280,6 +365,7 @@ def main():
     parser.add_argument('--dropout', type=float, default=DROPOUT, help='Dropout rate')
     parser.add_argument('--num_workers', type=int, default=NUM_WORKERS, help='Number of workers for data loading')
     parser.add_argument('--dataset_ratio', type=float, default=DATASET_RATIO, help='Ratio of the training set to use')
+    parser.add_argument('--task',  type=str, default="completion", help="Learning task i.e. (completion or denoising) for detection.")
 
     # parse args
     args = parser.parse_args()
