@@ -16,26 +16,26 @@
 ## Table of Contents
 - [Setup](#setup)
 - [Problem Understanding](#problem-understanding)
-  - [Problem 1. Noisy Data](#problem-1-noisy-data)
+  <!-- - [Problem 1. Noisy Data](#problem-1-noisy-data)
   - [Problem 2: Incomplete Data](#problem-2-incomplete-data)
-  - [Problem 3: Lack of Defect Data in Manufacturing](#problem-3-lack-of-defect-data-in-manufacturing)
+  - [Problem 3: Lack of Defect Data in Manufacturing](#problem-3-lack-of-defect-data-in-manufacturing) -->
 - [Dataset](#dataset)
 - [Part I: Point Cloud Denoising & Completion](#part-i-point-cloud-denoising--completion)
   - [Dataset Preparation](#dataset-preparation)
   - [Pre-Processing](#pre-processing)
-    - [Normalization](#normalization)
+    <!-- - [Normalization](#normalization)
     - [Down-sampling](#down-sampling)
-    - [Zero Padding (fake up-sampling)](#zero-padding-fake-up-sampling)
+    - [Zero Padding (fake up-sampling)](#zero-padding-fake-up-sampling) -->
   - [Data Augmentation](#data-augmentation)
-    - [Denoising Task: Adding Noise](#denoising-task-adding-noise)
+    <!-- - [Denoising Task: Adding Noise](#denoising-task-adding-noise)
     - [Point Completion Task: Removing Points](#point-completion-task-removing-points)
     - [Optional: Rotations](#optional-rotations)
-    - [On-The-Fly Data Augmentation](#on-the-fly-data-augmentation)
+    - [On-The-Fly Data Augmentation](#on-the-fly-data-augmentation) -->
   - [Define Model Architecture](#define-model-architecture)
-    - [CompletionTransformer](#completiontransformer)
-    - [DenoiserTransformer](#denoisertransformer)
+    <!-- - [CompletionTransformer](#completiontransformer)
+    - [DenoiserTransformer](#denoisertransformer) -->
   - [Training](#training)
-    - [Loss Function](#loss-function)
+    <!-- - [Loss Function](#loss-function)
     - [Training Objective](#training-objective)
     - [Experimental Setup](#experimental-setup)
     - [Hyperparameters](#hyperparameters)
@@ -44,7 +44,7 @@
     - [Random Seeds & Deterministic Augmentations](#random-seeds--deterministic-augmentations)
     - [Baseline Comparison](#baseline-comparison)
     - [Run Training](#run-training)
-    - [Optional: Download My Trained Models](#optional-download-my-trained-models)
+    - [Optional: Download My Trained Models](#optional-download-my-trained-models) -->
   - [Loss Curves](#loss-curves)
   - [Test Performance](#test-performance)
   - [Visualizing Denoised & Completed Point Clouds](#visualizing-denoised--completed-point-clouds)
@@ -54,8 +54,8 @@
   - [Optional: Download My Fine-tuned Models](#optional-download-my-fine-tuned-models)
   - [Generating Synthetic Defective Point Clouds](#generating-synthetic-defective-point-clouds)
   - [Visualizing/Assessing Realism of Synthetic Data](#visualizingassessing-realism-of-synthetic-data)
-    - [Synthetic "Removal/Incomplete" Defects](#synthetic-removalincomplete-defects)
-    - [Synthetic "Noise" Defects](#synthetic-noise-defects)
+    <!-- - [Synthetic "Removal/Incomplete" Defects](#synthetic-removalincomplete-defects)
+    - [Synthetic "Noise" Defects](#synthetic-noise-defects) -->
   - [Impact of Synthetic Data on Downstream Detection Models](#impact-of-synthetic-data-on-downstream-detection-models)
 
 
