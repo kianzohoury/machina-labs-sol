@@ -111,62 +111,14 @@ For point clouds with fewer than the desired number of points (i.e. 1024), I app
 To generate a noisy input $x$, I created the function `dataset.transform.add_noise()`, which randomly samples a noise vector $v_{noise} \sim \mathcal{N}(0, \epsilon)$ from a gaussian (or uniform distribution $U[-\epsilon, \epsilon]$, if specified), and perturbs the original point cloud $x = y + v_{noise}$. The amount of noise that is added is controlled by a parameter $\epsilon$. Increasing the value of $\epsilon$ makes it more challenging for the denoising model to recover the original signal. Of course, if the value is too high, the inputs will start to resemble noise more than the objects themselves, which may not even reflect the noise levels found in typical 3D scans. Nevertheless, it's worthwhile to push the model's denoising abilities by testing higher noise amounts.
 
 #### Point Completion Task: Removing Points
-The second augmentation is to randomly remove points for the point completion task, similar to the down-sampling process described above, except we will do it in a more structured way. The ratio $r \in [0, 1)$ controls the number of points to remove from the point cloud, and so we can, for example, choose $r=0.25$, which will drop $25\%$ of the points, giving us an incomplete point cloud containing the remaining $75\%$ of the points. Initially, I had thought to remove the points in a uniform way to create a "sparse" point cloud, but decided to remove entire sections of the point cloud, which is how point completion tasks are typically formulated. For this, I randomly selected a point in the point cloud and removed an entire section via a nearest neighbors approach.
-```python
-def remove_neighboring_points(point_cloud: torch.Tensor, num_remove: int):
-    """Removes a local section of points by remove the nearest neighbors starting 
-    from an initial point."""
-    starting_idx = torch.randint(0, point_cloud.shape[0], size=(1, ))
-    # get the initial point
-    center_point = point_cloud[starting_idx]
-    
-    # calculate pairwise distances between this point and all other points
-    distances = torch.cdist(center_point, point_cloud)
-    
-    # find indices to keep (corresponding to n - num_remove farthest neighbors)
-    _, indices_to_keep = torch.topk(
-        distances, max(0, point_cloud.shape[0] - num_remove), largest=True
-    )
-    
-    # remove points via indexing
-    reduced_point_cloud = point_cloud[indices_to_keep].squeeze(0)
-    return reduced_point_cloud
-```
+To create a partial/incomplete point cloud $x$, I created the function `dataset.transform.remove_neighboring_points()`, which given a ratio of points to remove $r \in [0, 1)$, starts with a random point in the set and removes it along with its $\lfloor |x| * r \rfloor$ nearest neighbors.
 
-##### On-The-Fly Data Augmentation
-Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy/incomplete point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for large transformer-based models. It's entirely plausible that an overparameterized model may memorize how to denoise a particular point cloud, if it always presents the same noise pattern. During a given training epoch, each point cloud $x$ will receive a slightly different, random transformation, achieved by implementing a `RandomTransform` class, ensuring that no transformation is identical across epochs. 
+#### Optional: Rotations
+Although not strictly necessary, I randomly applied $z$-axis rotations to point clouds in order for the models to see objects in different spatial orientations. The function `dataset.transform.rotate_z_axis()` selects a random angle $a \in [0, 2\pi]$ and applies a $3 \times 3$ rotation matrix $\mathrm{M_z}$, such that $x_{rot} = x\mathrm{M_{z}^{T}}$. Note that because the point cloud tensors are technically composed of row vectors, I had to transpose the rotation matrix before multiplication, since it assumes column vector orientation.
 
-Initially, when I was considering combining the two tasks, I was chaining together the `remove_points()` and `add_noise()` functions, which were assigned simple probabilities like $\text{Pr}(\text{add noise}) = \text{Pr}(\text{remove points}) = 0.25$ and $\text{Pr}(\text{both})=0.5$. However, I later decided to only apply the task-specific transformations as it simplified the learning task and design for each model.
+#### On-The-Fly Data Augmentation
+Similar to how models are trained in the literature, I used *on-the-fly* data augmentation for sampling noisy/incomplete point clouds. Dynamically augmenting the point clouds ensures that the model never fits to certain noise patterns, which is a real possibility for larger transformer-based models. It's entirely plausible that an over-parameterized model may memorize how to denoise particular point clouds if they always present the same noise patterns. During a given training epoch, each point cloud $x$ will receive a slightly different transformation, which is achieved with the `dataset.transform.RandomTransform` class and random seeding, which I will describe during the training setup.
 
-
-
-
-##### Optional: Rotations
-I also randomly applied $z$-axis rotations to point clouds in order for the models to see objects in different spatial orientations. Given an angle $a \in [0, 2\pi]$, the point clouds were rotated using a $3 \times 3$ rotation matrix $\mathrm{M_z}$: 
-
-$$x_{rot} = x\mathrm{M_{z}^{T}}$$
-
-Note that we have to transpose the matrix because it assumes column vector orientation, but we're dealing with tensors that contain row vectors.
-
-```python
-def rotate_z_axis(point_cloud: torch.Tensor) -> torch.Tensor:
-    """Applies a random z-axis rotation to the point cloud."""
-    # randomly sample angle
-    angle = torch.tensor(
-        2 * torch.pi * torch.rand(1).item(), dtype=torch.float32, device=point_cloud.device
-    )
-    
-    # z-axis rotation
-    rot_z = torch.tensor([
-        [torch.cos(angle), -torch.sin(angle), 0],
-        [torch.sin(angle), torch.cos(angle), 0],
-        [0, 0, 1]
-    ], device=point_cloud.device)
-
-    # apply rotation matrix
-    rotated_point_cloud = point_cloud.matmul(rot_z.T)
-    return rotated_point_cloud
-```
 
 ### Define Model Architecture
 
