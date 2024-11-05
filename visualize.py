@@ -147,36 +147,40 @@ def visualize_point_cloud(point_cloud: Union[np.ndarray, torch.Tensor]) -> None:
     fig.show()
     
     
-def compare_train_val_losses(model_paths: List) -> None:
+def compare_train_val_losses(
+    checkpoint: str,
+    log_scale: bool = True,
+    y_label: str = "Chamfer Distance",
+    x_label: str = "Number of Epochs"
+) -> None:
     """Compares the training and validation losses for every model variation."""
-    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
 
     # styling
-    ax[0].set_title("Training", fontsize=12)
-    ax[1].set_title("Validation", fontsize=12)
-    ax[0].set_xlabel("Number of Epochs", fontsize=12)
-    ax[1].set_xlabel("Number of Epochs", fontsize=12)
-    ax[0].set_ylabel("Chamfer Distance", fontsize=12)
-    ax[1].set_ylabel("Chamfer Distance", fontsize=12)
+    ax.set_title("Training vs. Validation Loss", fontsize=12)
+    ax.set_xlabel(x_label, fontsize=12)
+    ax.set_ylabel(y_label, fontsize=12)
     x_max = 0
 
-    # plotting
-    for checkpoint_name in model_paths:
-        # load checkpoint
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        state_dict = torch.load(f=checkpoint_name, map_location=device)
-        train_losses, val_losses = state_dict["train_losses"], state_dict["val_losses"]
-        x_max = max(x_max, len(train_losses))
-        label = f"$\epsilon$={state_dict['noise_amount']}, $r$={state_dict['removal_amount']}"
-        ax[0].plot(train_losses, label=label)
-        ax[1].plot(val_losses, label=label)
+    # load checkpoint
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    state_dict = torch.load(f=checkpoint, map_location=device)
+    train_losses, val_losses = state_dict["train_losses"], state_dict["val_losses"]
+    x_max = max(x_max, len(train_losses))
+    # try:
+    #     label = f"$\epsilon$={state_dict['noise_amount']}, $r$={state_dict['removal_amount']}"
+    # except Exception:
+    #     label = ""
+    ax.plot(train_losses, label="train")
+    ax.plot(val_losses, label="validation")
 
     # set the x-axis extent
-    ax[0].set_xticks(np.arange(x_max, step=x_max // 10).astype(int))
-    ax[1].set_xticks(np.arange(x_max, step=x_max // 10).astype(int))
+    ax.set_xticks(np.arange(x_max, step=x_max // 10).astype(int))
+    ax.set_xticks(np.arange(x_max, step=x_max // 10).astype(int))
 
     # set y-axis to log scale since Chamfer Dist can be quite small
-    ax[0].set_yscale('log')
-    ax[1].set_yscale('log')
-    ax[0].legend(loc="upper right")
-    ax[1].legend(loc="upper right")
+    if log_scale:
+        ax.set_yscale('log')
+        ax.set_yscale('log')
+    ax.legend(loc="upper right")
+    ax.legend(loc="upper right")
