@@ -184,7 +184,7 @@ where $\text{Q}$, $\text{K}$, and $\text{V}$ are called query, key, and value ve
 For both tasks, the general idea was to utilize the encoder for feature extraction and decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
 
 #### CompletionTransformer
-The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features and those features are aggregated/summarized into a global feature map that informs the query generation process. More specifically, queries are generated as follows:
+The architecture for the point completion model `models.completion.CompletionTransformer` consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features and those features are aggregated/summarized into a global feature map that informs the query generation process. More specifically, I implemented `models.transformer.QueryGenerator` as follows:
 
 ##### Query Generation
 1. concatenate all intermediate encoder features along the last (embedding) dimension
@@ -192,7 +192,7 @@ The architecture for the point completion model consists of an encoder, decoder,
 3. apply max/mean pooling to extract a "summary" of the global features
 4. generate "rough" coordinate features given the summarized features
 5. aggregate summary features from step 3 with the rough coordinate features via concatenation
-6. generate query embeddings by projecting aggregated features back to the embedding space
+6. generate `num_query` query embeddings by projecting aggregated features back to the embedding space
 
 The goal of the query generator module, is to generate an initial set of point embeddings given local/global features extracted by the encoder. Query embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the salient contextual features extracted by the encoder at each corresponding layer.
 
@@ -203,7 +203,7 @@ The goal of the query generator module, is to generate an initial set of point e
 Note that the diagram is simplified, but each self-attention/cross-attention module follows the standard transformer recipe, with residual layers, layer normalization, and feed-forward layers.
 
 #### DenoiserTransformer
-The architecture for denoising is similar, minus the additional module for generating new points. For this reason, I contemplated using just an encoder, but found it was better to incorporate a decoder, as it splits up the computation for the encoder. That is the encoder solely focuses on extracting rich contextual features, while the decoder focuses on reconstructing the set of points, given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct points.
+The architecture for the denoising model `models.denoiser.DenoiserTransformer` is similar, minus the additional module for generating new points. For this reason, I contemplated using just an encoder, but found it was better to incorporate a decoder, as it splits up the computation for the encoder. That is the encoder solely focuses on extracting rich contextual features, while the decoder focuses on reconstructing the set of points, given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct points.
 
 <p align="center">
   <img src="docs/denoisertransformer.png" alt="Image 1" width="47%" />
