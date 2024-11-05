@@ -10,7 +10,9 @@
 </p> -->
 
 <p align="center">
-  <img src="docs/table_completion_pred.gif" alt="Image 1" width="40%" />
+  <img src="docs/animation_1.gif" alt="Image 1" width="33%" />
+  <img src="docs/animation_5.gif" alt="Image 1" width="33%" />
+  <img src="docs/animation_3.gif" alt="Image 1" width="33%" />
 </p>
 
 <p align="center">
