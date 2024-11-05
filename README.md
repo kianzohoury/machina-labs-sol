@@ -497,7 +497,16 @@ python -m machina-labs-sol.point-e.text2ply_pointE --num_generate 5 --checkpoint
 which will load the specified model checkpoint, e.g. `removal_defect_diffusion.pth`, generate the specified number of defective points cloud (5 in this case), and save them to the output directory `machina-labs-sol/synthetic_data`. Note that I unfortunately had to remove the upsample model, which increases the density/quality of the point clouds (by approximately a factor of 4), since I could not download the necessary model checkpoint. Having that additional model would likely increase the fidelity a bit and in turn, realism of the defective point clouds as well. 
 
 ### Assessing Realism of Synthetic Defects with a Detection Model
-To determine the "realism" of the synthetic point cloud defects, I decided to train a simple transformer-based detection model `models.detection.Detector` on the synthetic defect point clouds, which was tested on "real" defects, aka, point clouds sampled from the same distribution as the initial training set. The table summarizes the results:
+To determine the "realism" of the synthetic point cloud defects, I decided to train a simple transformer-based detection model `models.detection.Detector` on the synthetic defect point clouds, which was tested on "real" defects, aka, point clouds sampled from the same distribution as the initial training set. The training and validation losses are shown below:
+
+<p align="center">
+  <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="70%" />
+</p>
+<p align="center">
+  <img src="docs/train_val_detector_removal.png" alt="Image 2" width="70%" />
+</p>
+
+The table summarizes the results:
 
 | Model    | Defect  | Accuracy (%)         |
 |----------|---------|--------------------|
