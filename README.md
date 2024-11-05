@@ -184,7 +184,15 @@ where $\text{Q}$, $\text{K}$, and $\text{V}$ are called query, key, and value ve
 For both tasks, the general idea was to utilize the encoder for feature extraction and decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
 
 #### CompletionTransformer
-The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the local/global contextual information provided by the encoder at each corresponding layer.
+The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized into a global feature map. More specifically, queries are generated as follows:
+1. concatenate all intermediate encoder features along the last (embedding) dimension
+2. project these features to a higher dimensional space
+3. apply max/mean pooling to extract a "summary" of the higher-dimensional encoded features
+4. generate "rough" coordinate features given the summarized features
+5. aggregate summary features from step 3 with the rough coordinate features via concatenation
+6. generate query embeddings by projecting aggregated features with another projection layer
+
+The goal of the query generator module, is to generate an initial set of point embeddings given local/global features extracted by the encoder. Query embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the salient contextual features extracted by the encoder at each corresponding layer.
 
 <p align="center">
   <img src="docs/completiontransformer.png" alt="Image 1" width="50%" />
