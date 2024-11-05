@@ -177,20 +177,22 @@ The models I designed for both tasks share the same general encoder-decoder, tra
 
 Since point clouds are unordered by nature, it made sense to use transformers, as they are permutation-equivariant (underlying computations of features are independent of their absolute orderings) without the use of standard positional encodings. Not only are transformers extremely powerful and easy to scale, but also highly-suited for learning complex relationships and long-range, global dependencies between points in a set, via the self-attention mechanism:
 
-$$Attention(Q, K, V) = \text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
+$$Attention(\text{Q}, \text{K}, \text{V}) = \text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
 
 where $\text{Q}$, $\text{K}$, and $\text{V}$ are called query, key, and value vectors, which are computed via matrix multiplication with learnable model parameters, i.e. $\text{Q} = QW^Q$, $\text{K} = KW^K$, and $\text{V} = VW^V$, where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$. Note that in our case, we will keep things simple and choose $d_{model} = d_k = d_v$. The underlying computation of the attention output for transformers allows each point to "attend" to all other points in a point set, and in this way, capture spatial/geometric relationships without explicitly computing things like relative distances or nearest neighbors (although encoding schemes that incorporate these can help boost performance as well).
 
 For both tasks, the general idea was to utilize the encoder for feature extraction and decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
 
 #### CompletionTransformer
-The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized into a global feature map. More specifically, queries are generated as follows:
+The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features and those features are aggregated/summarized into a global feature map that informs the query generation process. More specifically, queries are generated as follows:
+
+##### Query Generation
 1. concatenate all intermediate encoder features along the last (embedding) dimension
-2. project these features to a higher dimensional space
-3. apply max/mean pooling to extract a "summary" of the higher-dimensional encoded features
+2. project these combined features to a new "global" feature space
+3. apply max/mean pooling to extract a "summary" of the global features
 4. generate "rough" coordinate features given the summarized features
 5. aggregate summary features from step 3 with the rough coordinate features via concatenation
-6. generate query embeddings by projecting aggregated features with another projection layer
+6. generate query embeddings by projecting aggregated features back to the embedding space
 
 The goal of the query generator module, is to generate an initial set of point embeddings given local/global features extracted by the encoder. Query embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the salient contextual features extracted by the encoder at each corresponding layer.
 
