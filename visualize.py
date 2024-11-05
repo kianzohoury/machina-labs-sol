@@ -24,6 +24,7 @@ def visualize_point_cloud_comparison(
 
     # sample random point cloud belonging to the class
     idx = np.random.choice(dataset.class_label_to_idx[class_label])
+    print(f"Dataset index: {idx}")
     transformation_type, noisy_point_cloud, target_point_cloud = dataset[idx][-3:]
     if dataset.input_transform:
         ratio_removed = dataset.input_transform.removal_amount
@@ -118,7 +119,7 @@ def visualize_point_cloud(point_cloud: Union[np.ndarray, torch.Tensor]) -> None:
         rows=1, cols=1,
         specs=[[{'type': 'scatter3d'}]],
         subplot_titles=tuple(""),
-        horizontal_spacing=0.001
+        # horizontal_spacing=0.001
     )
 
     # create the scatter plots
@@ -135,6 +136,7 @@ def visualize_point_cloud(point_cloud: Union[np.ndarray, torch.Tensor]) -> None:
     # hides axes for cleaner look
     fig.update_layout(
         scene1=dict(
+            aspectmode="data",
             xaxis=dict(visible=False),
             yaxis=dict(visible=False),
             zaxis=dict(visible=False)
