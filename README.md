@@ -263,90 +263,130 @@ Below, I've provided the training and validation losses across the four models:
   <i>Epoch training and validation losses for CompletionTransformer</i>
 </p>
 
-For these models, we see that the `CompletionTransformer` takes almost twice as long to converge, which points to the fact that it is a harder task to learn and optimize for, as entirely new points have to be generated, rather than modifying existing points like `DenoiserTransformer`.
+For these models, we see that the `CompletionTransformer` takes almost twice as long to converge, which suggests that point completion is a more challenging task to learn, as entirely new points have to be generated, rather than modifying existing points like `DenoiserTransformer`.
 ### Test Performance
-To get the final evaluations of the denoising/point completion models, we simply have to run the following command:
+To run the final performance evaluation for the trained models, simply run the following command:
 ```bash
 python evaluate.py --model_dir ./checkpoints
 ```
-and by default, the test results are saved locally to `./test_results.csv`. The models were evaluated on a hold-out test set and the results are shown below:
+which runs evaluation on an unseen test set derived from the test split of ShapeNetCore, with augmentations generated exactly the same way as the training and validation splits. By default, the results are saved locally to `./test_results.csv`. The table is the final test results for my models:
 
-|   | Model                   | Noise Amount | Removal Ratio | Avg Chamfer Dist | Avg Chamfer Dist Baseline |
-|---|--------------------------|--------------|---------------|------------------|---------------------------|
-| 0 | completion_transformer_1 | 0.000        | 0.50          | 0.002907         | 0.091590                  |
-| 1 | completion_transformer_2 | 0.000        | 0.25          | 0.001228         | 0.017856                  |
-| 2 | denoiser_transformer_1   | 0.075        | 0.00          | 0.003186         | 0.007781                  |
-| 3 | denoiser_transformer_2   | 0.050        | 0.00          | 0.002601         | 0.004487                  |
+|   | Model                   | Noise Amount | Removal Ratio | Avg Chamfer Dist | Avg Chamfer Dist Baseline | Reduction (%) |
+|---|--------------------------|--------------|---------------|------------------|---------------------------|---------------|
+| 0 | completion_transformer_1 | 0.000        | 0.50          | 0.002907         | 0.091590                  | 96.83         |
+| 1 | completion_transformer_2 | 0.000        | 0.25          | 0.001228         | 0.017856                  | 93.12         |
+| 2 | denoiser_transformer_1   | 0.075        | 0.00          | 0.003186         | 0.007781                  | 59.05         |
+| 3 | denoiser_transformer_2   | 0.050        | 0.00          | 0.002601         | 0.004487                  | 42.03         |
 
-#### Visualizing Denoised/Completed Point Clouds
+We see that `CompletionTransformer` with $50\%$ missing data had a $96.83\%$ reduction in the average Chamfer distance. In fact, all four of the models significantly improved over the baseline performance, which is expected. However, the reductions in Chamfer distance are significant, indicating that the models I designed perform well in their associated tasks.
 
-##### Denoising
-The following images are generated from the same test set with the denoising model trained on 7.5% gaussian noise:
+### Visualizing Denoised & Completed Point Clouds
+The following images were generated from the same hold-out test set by `DenoiserTransformer` trained on 7.5% gaussian noise:
 
-*class: chair*
+<p align="center">
+  <i>class: chair</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_chair_1.png" alt="Image 1" width="70%" />
 </p>
 
-*class: chair*
+<p align="center">
+  <i>class: chair</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_chair_2.png" alt="Image 1" width="80%" />
 </p>
 
-*class: chair*
+<p align="center">
+  <i>class: chair</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_chair_3.png" alt="Image 1" width="80%" />
 </p>
 
-*class: table*
+<p align="center">
+  <i>class: table</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_table_1.png" alt="Image 1" width="80%" />
 </p>
 
-*class: airplane*
+<p align="center">
+  <i>class: airplane</i>
+</p>
+
+
 <p align="center">
   <img src="docs/d1_plane.png" alt="Image 1" width="80%" />
 </p>
 
-*class: car*
+<p align="center">
+  <i>class: car</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_car.png" alt="Image 1" width="80%" />
 </p>
 
-*class: cap*
+<p align="center">
+  <i>class: cap</i>
+</p>
+
 <p align="center">
   <img src="docs/d1_cap.png" alt="Image 1" width="80%" />
 </p>
 
-##### Completion
-The following images are generated from the same test set with the completion model trained with 50% of points missing:
+The following images were generated from the same hold-out test set by `CompletionTransformer` trained on 50% of points missing:
 
-*class: car*
+
+<p align="center">
+  <i>class: car</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_car.png" alt="Image 1" width="70%" />
 </p>
 
-*class: chair*
+<p align="center">
+  <i>class: chair</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_chair.png" alt="Image 1" width="80%" />
 </p>
 
-*class: earphone*
+<p align="center">
+  <i>class: earphone</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_earphone.png" alt="Image 1" width="80%" />
 </p>
 
-*class: airplane*
+<p align="center">
+  <i>class: airplane</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_plane_1.png" alt="Image 1" width="80%" />
 </p>
 
-*class: airplane*
+<p align="center">
+  <i>class: airplane</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_plane_2.png" alt="Image 1" width="80%" />
 </p>
 
-*class: table*
+<p align="center">
+  <i>class: table</i>
+</p>
+
 <p align="center">
   <img src="docs/ct1_table.png" alt="Image 1" width="80%" />
 </p>
