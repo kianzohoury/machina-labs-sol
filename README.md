@@ -506,7 +506,7 @@ which will train the detection model using synthetic defect and real nominal (no
 The training and validation losses are shown below:
 
 <p align="center">
-  <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="70%" />
+  <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="80%" />
 </p>
 
 <p align="center">
@@ -515,7 +515,7 @@ The training and validation losses are shown below:
 
 
 <p align="center">
-  <img src="docs/train_val_detector_removal.png" alt="Image 2" width="70%" />
+  <img src="docs/train_val_detector_removal.png" alt="Image 2" width="80%" />
 </p>
 
 <p align="center">
