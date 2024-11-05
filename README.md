@@ -59,7 +59,8 @@
   - [Run Fine-tuning](#run-fine-tuning)
   - [Download My Fine-tuned Models](#download-my-fine-tuned-models)
   - [Generating Synthetic Defective Point Clouds](#generating-synthetic-defective-point-clouds)
-  - [Visualizing/Assessing Realism of Synthetic Data](#visualizingassessing-realism-of-synthetic-data)
+  - [Assessing Realism of Synthetic Defects with a Detection Model](#assessing-realism-of-synthetic-defects-with-a-detection-model)
+  - [Visualizing Synthetic Defects](#visualizing-synthetic-defects)
     <!-- - [Synthetic "Removal/Incomplete" Defects](#synthetic-removalincomplete-defects)
     - [Synthetic "Noise" Defects](#synthetic-noise-defects) -->
   - [Impact of Synthetic Data on Downstream Detection Models](#impact-of-synthetic-data-on-downstream-detection-models)
@@ -532,22 +533,22 @@ which indicates that the models were able to be trained on synthetic data. The f
 
 We see that synthetic noise defects are "realistic" because the detection model is able to generalize well to real noise defects. However, the same cannot be said for removal defects, as the detection model incorrectly classifies nominal/defect point clouds 50% of the time. 
 
-#### Synthetic "Removal/Incomplete" Defects
+### Visualizing Synthetic Defects
 Let's actually take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
 
 <p align="center">
-  <img src="docs/chair_removal_synthetic.png" alt="Image 1" width="20%" />
-  <img src="docs/table_removal_synthetic.png" alt="Image 2" width="20%" />
-  <img src="docs/laptop_removal_synthetic.png" alt="Image 3" width="26%" />
+  <img src="docs/mug_removal_synthetic.png" alt="Image 1" width="30%" />
+  <img src="docs/table_removal_synthetic_2.png" alt="Image 2" width="30%" />
+  <img src="docs/chair_removal_synthetic_2.png" alt="Image 3" width="26%" />
 </p>
 
 We see that the first two point clouds for the chair and table are quite deformed, missing structural pieces, while the third point cloud of a laptop has more structural integrity, but is missing clusters of points on both of its flat surfaces. I believe additional fine-tuning is required to generate more realistic samples, but I did not run enough inference to conclusively say this model generates completely unrealistic incomplete point clouds. 
 
 #### Synthetic "Noise" Defects
 <p align="center">
-  <img src="docs/airplane_synthetic_noise.png" alt="Image 1" width="20%" />
-  <img src="docs/chair_synthetic_noise.png" alt="Image 2" width="20%" />
-  <img src="docs/table_synthetic_noise.png" alt="Image 3" width="26%" />
+  <img src="docs/laptop_noise_synthetic.png" alt="Image 1" width="30%" />
+  <img src="docs/chair_noise_synthetic.png" alt="Image 2" width="30%" />
+  <img src="docs/table_noise_synthetic.png" alt="Image 3" width="36%" />
 </p>
 Compared to the synthetic data with removal defects, the synthetic noisy samples are more coherent, interestingly enough. They are not as noisy as the original distribution the diffusion model was fine-tuned on, which again, is surprising, but perhaps not if you consider the "denoising" nature of diffusion models. Perhaps it's harder/takes longer to fine-tune the model to understand that noise is desired, in this case, and not noise that is removed from latent representations during the backward phase. Nevertheless, these examples are geometrically consistent but noisy enough to be somewhat realistic and possibly representative of real-world laser-scanned 3D data.
 
