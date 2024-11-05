@@ -497,7 +497,13 @@ python -m machina-labs-sol.point-e.text2ply_pointE --num_generate 5 --checkpoint
 which will load the specified model checkpoint, e.g. `removal_defect_diffusion.pth`, generate the specified number of defective points cloud (5 in this case), and save them to the output directory `machina-labs-sol/synthetic_data`. Note that I unfortunately had to remove the upsample model, which increases the density/quality of the point clouds (by approximately a factor of 4), since I could not download the necessary model checkpoint. Having that additional model would likely increase the fidelity a bit and in turn, realism of the defective point clouds as well. 
 
 ### Assessing Realism of Synthetic Defects with a Detection Model
-To determine the "realism" of the synthetic point cloud defects, I decided to train a simple transformer-based detection model `models.detection.Detector` on the synthetic defect point clouds, which was tested on "real" defects, aka, point clouds sampled from the same distribution as the initial training set. The training and validation losses are shown below:
+To determine the "realism" of the synthetic point cloud defects, I decided to train a simple transformer-based detection model `models.detection.Detector` on the synthetic defect point clouds, which was tested on "real" defects, aka, point clouds sampled from the same distribution as the initial training set. To train the detection model, `cd` into `machina-labs` and run the following:
+```bash
+python train_detection.py --task completion --max_num_epochs 10
+```
+which will train the detection model using synthetic defect and real nominal (non-defect) point clouds for the specified `--task`. I generated 200 synthetic point clouds (100 incomplete point clouds + 100 noisy point clouds), which equated to 100 synthetic defect + 100 real nominal training examples per detection model.
+
+The training and validation losses are shown below:
 
 <p align="center">
   <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="70%" />
@@ -506,17 +512,18 @@ To determine the "realism" of the synthetic point cloud defects, I decided to tr
   <img src="docs/train_val_detector_removal.png" alt="Image 2" width="70%" />
 </p>
 
-The table summarizes the results:
+which indicates that the models were able to be trained on synthetic data. The following table summarizes the test results, which show the detection models' performances on "real" defect point clouds:
 
 | Model    | Defect  | Accuracy (%)         |
 |----------|---------|--------------------|
 | Detector | Noise   | 92.31 |
 | Detector | Removal | 49.48 |
 
-
-Let's take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
+We see that synthetic noise defects are "realistic" because the detection model is able to generalize well to real noise defects. However, the same cannot be said for removal defects, as the detection model incorrectly classifies nominal/defect point clouds 50% of the time. 
 
 #### Synthetic "Removal/Incomplete" Defects
+Let's actually take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
+
 <p align="center">
   <img src="docs/chair_removal_synthetic.png" alt="Image 1" width="20%" />
   <img src="docs/table_removal_synthetic.png" alt="Image 2" width="20%" />
