@@ -174,7 +174,7 @@ I should also note that for both models, I did not use positional embeddings, si
 
 ### Training
 The following section outlines the training and experimental setups. 
-#### **Loss Function**
+#### Loss Function
 For both denoising and point completion tasks, I chose the **Chamfer Distance** as the loss function, since point clouds are unordered sets, and typical reconstruction losses such as mean squared error (MSE) are not suitable. The loss function is defined as:
 
 <p align="center">
@@ -183,14 +183,14 @@ For both denoising and point completion tasks, I chose the **Chamfer Distance** 
 
 Note that I used the Euclidean distance formulation here (but $||\cdot||_{1}$ norm is sometimes used). Given two point clouds $P_1 \in \mathbb{R}^3$, $P_2 \in \mathbb{R}^3$, it essentially measures the distance between them. Specifically, for every point in $P_1$, it measures the distance between the nearest point in $P_2$, and vice versa. One thing to consider is that efficiently implementing this loss requires an efficient method of computing nearest neighbors (e.g. using K-D trees). In order to maximize efficiency (training speed), I've shamelessly decided to utilize NVIDIA's kaolin library, as their implementation uses special CUDA-related optimizations.
 
-#### **Training Objective**
+#### Training Objective
 Both denoising and point completion are supervised learning tasks, where we have a labeled training set $\mathcal{D}_{i}^{N} = \{(x_1, y_2),...,(x_N, y_N)\}$ of pairs of noisy (or incomplete) and clean point clouds. The training objective is to find the optimal set of parameters $\theta$ for the model that minimizes the expected loss over the entire dataset, namely:
 
 $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 
 where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is the `DenoiserTransformer`/`CompletionTransformer` model.
 
-#### **Experimental Setup**
+#### Experimental Setup
 For `DenoiserTransformer` and `CompletionTransformer`, I investigated $\epsilon = 0.05, 0.075$ and $r=0.25, 0.50$, respectively. The table below summarizes the model training experiments that were ran:
 
 | Model               | noise strength (%) | points removed (%) | input dimension | output dimension | # parameters (MM) |
@@ -200,8 +200,8 @@ For `DenoiserTransformer` and `CompletionTransformer`, I investigated $\epsilon 
 | CompletionTransformer |      0           |        25         |         768        |   1024               |   21.04               |
 | CompletionTransformer |      0           |        50         |     512            |    1024              |   21.83               |
 
-#### **Hyperparameters**
-The hyperparameters for training the denoising models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments, due to simplicity and the time constraint for this assignment. However, in practice one should optimize the hyperparameters separately for each of these four models as the distribution of the training data will be slightly to significantly different based on how different or extreme the data augmentations are for each combination.
+#### Hyperparameters
+The hyperparameters for training the models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments.
 
 * learning rate: $1e-4$
 * warmup ratio: $0.1$
@@ -216,91 +216,55 @@ The hyperparameters for training the denoising models were chosen empirically ba
 * embedding & K, Q, V vector dimension: $256$
 * dataset ratio (portion of training set): $1$ 
 
-#### **Optimization**
+#### Optimization
 For optimization, I chose AdamW (with default parameters) as it's a powerful adaptive, momentum-based gradient descent optimization method that is typically very effective for training larger, transformer-based models. I also decided to use learning rate scheduling as it also (in my experience) improves training stability for transformer models. I used a linear schedule for the first 10% of training steps (10 epochs) to warmup the model and a cosine annealing schedule for the remaining 90% of training steps (90 epochs). I found that the warmups were essential for stable training in the initial stages, otherwise the models had trouble learning at all.
 
-#### **Cross Validation**
+#### Cross Validation & Early Stopping
 
-##### Deterministic Augmentations
-During training, data augmentations happens on-the-fly, but the augmentations for the validation set needed to be fixed in order to achieve consistency with cross validation. By defining a `worker_init_fn()`, I was able to deterministically control how augmentations were made to data batches. This is because `worker_init_fn()` is called when each worker is spawned (in parallel), and so the global random state (defined by the numpy seed) can fix the sampling behavior that control the augmentations when the data loader fetches a batch of data using different workers.
+For a given training run, model selection was carried out using cross validation on the ShapeNetCore validation split, which was augmented in the same fashion as the training set. I implemented early stopping based on the validation loss, meaning that after a certain number of epochs (i.e. 10 epochs) of no improvement, training would terminate. This is one way that we can prevent overfitting, since we can simply stop training once the model stops improving. However, for training models on the full training set, early stopping was never activated.
 
-```python
-def worker_init_fn(worker_id) -> None:
-    """Custom initialization function that helps fix data augmentation behavior per worker."""
-    seed = torch.initial_seed() % (2 ** 32)
-    torch.manual_seed(seed + worker_id)
-```
+#### Random Seeds & Deterministic Augmentations
+Although data augmentations happens on-the-fly, I wanted to maintain consistency across models and reproducibility. Firstly, I set a master seed and then generated `max_num_epochs` seed values, each to be set during a new epoch. The reason I felt this was important, is because I didn't want the variance in model performance to depend on the randomness of the data augmentations across training runs, as they would technically be seeing and training on slightly different distributions of data. Furthermore, by defining a `worker_init_fn()` in `train.py`, I was able to deterministically fix each batch generated by the dataloader across different workers, as `worker_init_fn()`, when called, ties the initial state of the worker process to the global random seed state.
 
-I also wanted to maintain consistency for each denoising experiment (i.e. training run) while allowing the data augmentations to be different for each epoch. To do this, I stored a master seed, and then generated `max_num_epochs` number of seeds, each being set during a new training epoch. The reason I felt this was important, is because I didn't want the variance in model performance to depend on the randomness of the data augmentations across training runs, as they would technically be seeing and training on slightly different distributions of data.
-
-```python
-torch.manual_seed(0)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(0)
-        
-# this allows each model to receive the same training augmentations
-training_augmentation_seeds = torch.randint(2, 2**32 - 1, size=(MAX_NUM_EPOCHS, ))
-```
-
-##### Early Stopping
-
-For a given experiment (training run), model selection was driven using **early stopping** based on a validation criteria (i.e. average loss). For each epoch, the denoising model is evaluated on a validation set using the same loss function during training. After 10 epochs, we terminate training if validation performance stagnates. This is one way that we can prevent **overfitting**, since we can simply stop training once the model stops improving. In my training code, it looks like this:
-
-```python
-if val_loss < best_val_loss:
-    best_val_loss = val_loss
-    # reset early stopping counter
-    count = 0
-
-    # save best model
-    torch.save(...)
-    print("Best model saved.")
-else:
-    # increment early stopping counter
-    count += 1
-    if count == patience:
-        # stop training
-        print("Stopping training early.")
-        break
-```
-
-##### Baseline Comparison
-One insightful validation/evaluation strategy is to also compare these models against a baseline (no model, just the Chamfer Distance between each $x$ and $y$ in the test dataset), to see if the models are actually better/worth using. We will use this to monitor model training but also evaluate their final performance.
-
-The final model and checkpoint file that would be ultimately saved was the one tied to the highest validation performance (lowest total $L_{CD}$ loss), not the one resulting after all 100 epochs of training was completed.
-
+#### Baseline Comparison
+Lastly, I compared the models against a baseline, i.e. the average Chamfer distance of the validation set = $\frac{1}{N}\sum_i^N L_{CD}(x_i, y_i)$.
+I used this baseline to monitor model training but also evaluate the final performance of my models.
 
 #### Run Training
 To run model training, use the following command:
 ```bash
-python train.py --task denoising --dataset_ratio 0.1 --num_layers 4 --max_num_epochs 10
+python train.py --task denoising --dataset_ratio 0.1 --num_layers 4 --max_num_epochs 5
 ```
-which will run the specific model training task (i.e. denoising or completion). The above justs tests the functionality of the training code, since it only trains the model for a maximum of 10 epochs using only 10% of the training set on a smaller model with just 4 encoder/decoder layers.
+which will run the specific model training task (i.e. denoising or completion). The above justs tests the functionality of the training code, as it will only train the model for a maximum of 5 epochs using only 10% of the training set on a smaller model with just 4 encoder/decoder layers.
 
-#### Optional: Download My Trained Models
-To download the model checkpoints I trained previously, run the following commands:
+### Optional: Download My Trained Models
+To download the final model checkpoints I previously trained for this assignment, run the following commands:
 ```bash
 huggingface-cli download kianzohoury/shapenet_tasks --local-dir ./checkpoints
 ```
 which will save the denoising and point completion model checkpoints as `.pth` files in the `machina-labs-sol/checkpoints` directory.
 
-#### **Visualizing Loss Curves**
+### Loss Curves
+Below, I've provided the training and validation losses across the four models:
 
-It's always good practice to visualize your model performance during and after training. Usually, I will start with something like tensorboard because it is easy to integrate and track experiments, but I kept it simple for this assignment and just saved the per-epoch train and validation losses with `torch.save()`. Below, we can see the training and validation results of the four models:
-
-##### DenoiserTransformer
 <p align="center">
   <img src="docs/denoiser_train_val_comp.png" alt="Image 2" width="100%" />
 </p>
 
+<p align="center">
+  <i>Epoch training and validation losses for DenoiserTransformer</i>
+</p>
 
-##### CompletionTransformer
 <p align="center">
   <img src="docs/completion_train_val_comp.png" alt="Image 99" width="100%" />
 </p>
 
-### Model Evaluation
-#### Test Performance
+<p align="center">
+  <i>Epoch training and validation losses for CompletionTransformer</i>
+</p>
+
+For these models, we see that the `CompletionTransformer` takes almost twice as long to converge, which points to the fact that it is a harder task to learn and optimize for, as entirely new points have to be generated, rather than modifying existing points like `DenoiserTransformer`.
+### Test Performance
 To get the final evaluations of the denoising/point completion models, we simply have to run the following command:
 ```bash
 python evaluate.py --model_dir ./checkpoints
