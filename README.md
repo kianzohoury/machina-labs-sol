@@ -32,15 +32,29 @@ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/t
 ```
 
 ## Problem Understanding
-3D sensors like LiDAR are prone to generating noisy and incomplete point clouds, due to several factors like hardware/sensor limitations, human error, environment, etc. Thus, there is a strong need for deep neural networks to process and restore noisy/incomplete point clouds, to enable important downstream tasks, especially in the realm of manufacturing such as process monitoring and quality control. Without accurate data, the models (e.g. defect detection models) that drive these downstream tasks cannot make reliable predictions, and so the quality of manufactured parts cannot be reliably monitored or certified.
+3D sensors like LiDAR are prone to generating noisy, incomplete point clouds, due to several factors like hardware/sensor limitations, human error, environment, etc. Thus, there is a strong need for deep neural networks, especially in the realm of manufacturing, to efficiently process and accurately restore noisy/incomplete point clouds. Achieving such models is crucial, as they unlock the potential for fully automated process monitoring and quality control. Without accurate point cloud data, downstream systems like defect detection models cannot make reliable predictions, and so the quality of manufactured parts cannot be trusted and certified.
 
-### Noisy Data
-Point clouds affected by noise are problematic because the actual $(x, y, z)$ coordinate positions are unknown, and so the observed points derived from the 3D scanning process are not accurate. Even small amounts of noise can cause uncertainty for a downstream detection model, especially if the defects intended to be recognized are small. In computer vision, several methods have been introduced to denoise images (e.g. denoising autoencoders). In the context of geometric data, similar deep neural network architectures can be adapted to denoise point clouds, by essentially learning spatial/geometric features associated with objects represented by entire point clouds, and "removing" noise by adjusting the coordinate positions of the corresponding/affected points.
+### Problem 1. Noisy Data
+Point clouds affected by noise are problematic because the true $(x, y, z) \in \mathbb{R}^3$ coordinate positions are unknown, which means the observed points derived from the 3D scanning process are not fully accurate. Even small amounts of noise can contribute to model uncertainty for downstream detection/classification systems, especially if the defects to be identified are small. In computer vision, several methods have been introduced to denoise images (e.g. denoising autoencoders). In the context of geometric data, similar deep neural network architectures have been adapted to denoise point clouds. By learning latent spatial/geometric features associated with 3D objects, denoising models can learn to reduce residual noise and produce cleaner sets of points, resulting in smoother object surfaces with more identifiable shapes.
 
-### Incomplete Data
-Even if noise can be reduced significantly, 3D scans may sometimes have only partial information. Again, due to several factors, a significant number of points can go missing, and retrieving those points may be impossible altogether. Therefore, we also need deep neural networks that can extrapolate the set of points that serve to "complete" the partial point cloud. Again, in computer vision, architectures like masked autoencoders attempt to fill in unknown/masked sections of images by relying on local features. Likewise, point completion models in the context of geometric data like point clouds can similarly rely on contextual information like surrounding points, to fill in sections of the object that are missing. However, the challenging aspect of point completion is capturing enough relevant context, both locally *and* globally in order for the model to understand what the partial/unknown object is and the points it needs to generate.
+<p align="center">
+  <img src="docs/noise_gradient.png" alt="Image 99" width="70%" />
+</p>
+<p align="center">
+  <i>Point cloud of an airplane becomes less identifiable as the noise level gradually increases.</i>
+</p>
 
-### Lack of Defect Data in Manufacturing
+### Problem 2: Incomplete Data
+Even if noise can be significantly reduced, it is common for 3D scans to only contain partial information of the object. Again, due to different factors (e.g. sensor malfunctions and occlusions), a sizeable portion of points can go missing, and retrieving these points may be time-consuming, costly, or outright impossible. Therefore, we also need deep neural networks that can extrapolate from a partial set of points and "complete" the full picture. In computer vision, architectures like masked autoencoders attempt to fill in masked sections of images by relying on local features extracted via convolutional filters. Similarly, point completion models operate on point sets, which inherently contain neighborhoods/regions of points that provide salient contextual information necessary to accurately fill in missing pieces of an object. However, a key challenge in point completion is capturing sufficient relevant context, both locally *and* globally, to help the model to understand which features to focus on when generating new points.
+
+<p align="center">
+  <img src="docs/missing_gradient.png" alt="Image 99" width="70%" />
+</p>
+<p align="center">
+  <i>Point cloud of an airplane still identifiable but missing crucial spatial/geometric data as number of missing points increases.</i>
+</p>
+
+### Problem 3: Lack of Defect Data in Manufacturing
 Additionally, when it comes to manufacturing, there is a need for high quality data used for training defect detection models. However, in situations where the quantity of data containing certain defects (e.g. tears, dents, cracks) is lacking, we need to simulate such defects. While it's possible to train detection models on limited data, we cannot be certain they are generalize well to unseen, real-world data. In order to create more robust detection models, we need to generate additional, high quality data in a controlled manner. Conditional generative models can do exactly that, as they enable the creation of synthetic data given an input such a text prompt. Diffusion models, in particular, are well-equiped to generate a variety of examples of a specific class (e.g. defect type), if we can somehow prepare/collect an initial distribution of data (in this case, defective point clouds) that we wish to model. However, the main issue with synthetic data is achieving realism; that is, data that is plausible and helpful in training a downstream detection/classification model, by improving its performance and filling in gaps in the data distribution that were not well-represented before.
 
 ## Dataset
@@ -102,7 +116,7 @@ def normalize_point_cloud(point_cloud: torch.Tensor) -> torch.Tensor:
 
 ##### Down-sampling
 
-Following data normalization, I down-sampled the point clouds to initially a maximum of 2048 points, but later found 1024 to be easier to work with (due to computational constraints). This was done by simply uniformily random sampling indices of the point cloud array to remove from the whole point cloud. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller). This is done in the `__getitem__()` function of `NoisyShapeNetCore`:
+Following data normalization, I down-sampled the point clouds to initially a maximum of 2048 points, but later found 1024 to be easier to work with (due to computational constraints). This was done by simply uniformily random sampling indices of the point cloud array to remove from the whole point cloud. Note, this is not the same as scaling (e.g. scaling the 3D object described by the point cloud to be larger or smaller). This is done in the `__getitem__()` function of `ShapeNetCore`:
 ```python
 # downsample to max_points if necessary
 if num_points > self.max_points:
@@ -215,13 +229,38 @@ def rotate_z_axis(point_cloud: torch.Tensor) -> torch.Tensor:
 
 ### Define Model Architecture
 
-The architecture that I chose leverages transformers as they are highly adaptable beyond natural language tasks, including vision and geometric data such as the types of data (i.e. point clouds) we're dealing with. The idea behind using transformers is two-fold: (1) they are extremely powerful and easy to scale, as we can increase the depth of the model with a single line of code in PyTorch; (2) and more importantly, they utilize self-attention, which is a highly important concept that allows the model to learn potentially global/long-range dependencies, on top of local contextual information of point clouds and the objects they describe. Self-attention is defined as:
+The models I designed for both tasks share the same general encoder-decoder, transformer-based architecture. Compared with sequence-to-sequence translation models that typically use an encoder-decoder transformer structure, the models I designed are more
+
+
+
+Yes, that’s correct. Encoder-decoder transformer architectures for point clouds are indeed more similar to vanilla CNN autoencoders than to autoregressive transformers. Here’s why:
+
+Non-Autoregressive Output: Like CNN autoencoders, point cloud transformers process the entire input as a whole and output a full set of points simultaneously. They aren’t generating one point at a time in a sequential, autoregressive fashion as transformers do for text generation or sequence-to-sequence tasks in NLP.
+
+Set-Based Encoding: The transformer encoder in point cloud models captures relationships among points within a cloud without requiring an inherent order (similar to CNNs, which treat the spatial arrangement in images as a grid rather than a sequence). This approach aligns more with CNNs, where feature maps capture spatial or relational structure rather than sequential dependencies.
+
+Permutation Invariance: Point cloud transformers, like CNNs, are designed to handle permutation-invariant data, which is critical for unordered data like point clouds. CNN autoencoders achieve this through spatial filters, while transformers achieve it through self-attention layers that relate points to each other independently of order.
+
+Reconstruction-Based Loss: The loss functions used in point cloud models, such as Chamfer Distance or Earth Mover’s Distance, resemble the reconstruction-based losses in CNN autoencoders (e.g., mean squared error) rather than token-based cross-entropy losses typical in autoregressive models.
+
+So, transformer-based point cloud models share much more in common with CNN-style autoencoders—focusing on capturing spatial or structural relationships rather than autoregressively generating ordered sequences.
+
+
+
+By nature, point clouds are unordered, so 
+
+
+For both tasks, I felt it was necessary to include a decoder on top of an encoder,  and the general idea of an autoencoder is to utilize an encoder for feature extraction and a decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
+
+
+
+that I chose leverages transformers as they are highly adaptable beyond natural language tasks, including vision and geometric data such as the types of data (i.e. point clouds) we're dealing with. The idea behind using transformers is two-fold: (1) they are extremely powerful and easy to scale, as we can increase the depth of the model with a single line of code in PyTorch; (2) and more importantly, they utilize self-attention, which is a highly important concept that allows the model to learn potentially global/long-range dependencies, on top of local contextual information of point clouds and the objects they describe. Self-attention is defined as:
 
 $$\text{Softmax}(\frac{\text{Q}\text{K}^{T}}{\sqrt{d_{k}}})\text{V}$$
 
 where $\text{K} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{Q} \in \mathbb{R}^{d_k \times d_{model}}$, $\text{V} \in \mathbb{R}^{d_v \times d_{model}}$ are learnable model parameters that are used in the computation of the attention output for each self-attention mechanism.
 
-More specifically, I treated both denoising and point completion as a set-to-set translation problem, utilizing an encoder-decoder architecture. For both tasks, I felt it was necessary to include a decoder on top of an encoder, since sequence to sequence translation models use this architecture, and the general idea of an autoencoder is to utilize an encoder for feature extraction and a decoder for reconstruction. The specific architecture I implemented for point cloud completion is inspired by [PoinTr](https://github.com/yuxumin/PoinTr), while the denoising model is a simpler, more general encoder-decoder transformer model.
+
 
 #### CompletionTransformer
 The architecture for the point completion model consists of an encoder, decoder, and query generator. The encoder extracts spatial/geometric features, layer by layer, and those features are aggregated/summarized in a global feature map. The global feature feature is combined with the intermediate encoder features and fed into the query generator module, which initially generates a specified/fixed set of point embeddings. These "query" embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the local/global contextual information provided by the encoder at each corresponding layer.
