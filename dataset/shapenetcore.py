@@ -150,6 +150,22 @@ class ShapeNetCore(Dataset):
         return class_idx, class_label, transform_type, noisy_point_cloud, target_point_cloud
     
 
+class ShapeNetCoreDefectDetection(Dataset):
+    """Wrapper for ShapeNetCore for defect detection."""
+    def __init__(self, **kwargs):
+        super(ShapeNetCoreDefectDetection, self).__init__()
+        self.data = ShapeNetCore(**kwargs)
+        
+    def __len__(self) -> int:
+        return len(self.data)
+    
+    def __getitem__(self, idx):
+        """Returns a real (non-synthetic) defect example."""
+        label = 0 if self.data.input_transform is None else 1
+        return self.data[idx][-2], label
+        
+
 if __name__ == "__main__":
     # simply download to current directory
     extract_data("./")
+    
