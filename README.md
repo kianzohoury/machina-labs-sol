@@ -5,8 +5,12 @@
 ### 310-508-1617
 
 
-<p align="center">
+<!-- <p align="center">
   <img src="docs/ct1_table.png" alt="Image 1" width="75%" />
+</p> -->
+
+<p align="center">
+  <img src="docs/table_completion_pred.gif" alt="Image 1" width="40%" />
 </p>
 
 <p align="center">
