@@ -111,7 +111,7 @@ For point clouds with fewer than the desired number of points (i.e. 1024), I app
 To generate a noisy input $x$, I created the function `dataset.transform.add_noise()`, which randomly samples a noise vector $v_{noise} \sim \mathcal{N}(0, \epsilon)$ from a gaussian (or uniform distribution $U[-\epsilon, \epsilon]$, if specified), and perturbs the original point cloud $x = y + v_{noise}$. The amount of noise that is added is controlled by a parameter $\epsilon$. Increasing the value of $\epsilon$ makes it more challenging for the denoising model to recover the original signal. Of course, if the value is too high, the inputs will start to resemble noise more than the objects themselves, which may not even reflect the noise levels found in typical 3D scans. Nevertheless, it's worthwhile to push the model's denoising abilities by testing higher noise amounts.
 
 #### Point Completion Task: Removing Points
-To create a partial/incomplete point cloud $x$, I created the function `dataset.transform.remove_neighboring_points()`, which given a ratio of points to remove $r \in [0, 1)$, starts with a random point in the set and removes it along with its $\lfloor |x| * r \rfloor$ nearest neighbors.
+To create an incomplete point cloud $x$, I created the function `dataset.transform.remove_neighboring_points()`, which given a ratio of points to remove $r \in [0, 1)$, starts with a random point in the set and removes it along with its $\lfloor |x| * r \rfloor$ nearest neighbors. For example, if we choose $r=0.5$, we will have training inputs of size $|x| = 512$ and ground truth labels of size $|y| = 1024$. Note that for the denoising task, however, it's always true that $|x| = |y|$ since no points are ever added or removed.
 
 #### Optional: Rotations
 Although not strictly necessary, I randomly applied $z$-axis rotations to point clouds in order for the models to see objects in different spatial orientations. The function `dataset.transform.rotate_z_axis()` selects a random angle $a \in [0, 2\pi]$ and applies a $3 \times 3$ rotation matrix $\mathrm{M_z}$, such that $x_{rot} = x\mathrm{M_{z}^{T}}$. Note that because the point cloud tensors are technically composed of row vectors, I had to transpose the rotation matrix before multiplication, since it assumes column vector orientation.
@@ -162,7 +162,7 @@ The architecture for the point completion model consists of an encoder, decoder,
   <img src="docs/completiontransformer.png" alt="Image 1" width="50%" />
 </p>
 
-#### DenoisingTransformer
+#### DenoiserTransformer
 The architecture for denoising is similar, except it does not have an additional module for generating new points. For this reason, I contemplated using only an encoder, because the output point cloud will always have the same number of points as the input. However, I added the decoder as well, because I felt it would help to progressively refine the predictions, as the encoder could solely focus on extracting rich contextual features, while the decoder could focus on reconstruction and learning the appropriate point offsets given the learned features from the encoder. Again, the decoder uses the latent features from the encoder as keys/values, attending to the features that help the decoder refine and reconstruct the correct point embeddings.
 
 <p align="center">
@@ -172,15 +172,10 @@ The architecture for denoising is similar, except it does not have an additional
 
 I should also note that for both models, I did not use positional embeddings, since point clouds inherently contain positional information. However, some methods in the literature use geometric embeddings, utilizing k nearest neighbors (k-NN) to extract local information for each point. In hindsight, if I had more time, I would've explored using pre-trained models to extract embeddings; however, for the purposes of this assignment, I implemeneted learned embeddings to project the points into a higher dimensional space, and used a similar method to map the decoder's final feature embeddings back to $\mathbb{R}^3$.
 
-### Training Denoising/Point Completion Models
-Now that the model architectures are outlined, we have to solve both tasks of (1) denoising point clouds and (2) completing point clouds with randomly missing points. However, I would also like to note that while these can be thought of as distinct tasks, where one model could learn to denoise (e.g. denoising autoencoder) and another model solely for point completion, they could also in theory, be combined, which is initially what I did, until I found it easier/cleaner to split up the models. In some sense, missing points is a form of "noise" as it results in lossy data that would likely increase the uncertainty of a classification model designed to classify a point cloud. 
-
-Furthermore, before training, we need to determine an appropriate loss function that is not only well-suited for this task, but also differentiable. This is key, as it enables us to optimize our model using gradient descent, which requires differentiability to calculate gradients and run backpropagation.
-
+### Training
+The following section outlines the training and experimental setups. 
 #### **Loss Function**
-We can unify both tasks with a single loss function, namely, **Chamfer Distance**. It is defined as:
-
-<!-- $$L_{CD}(P_{1}, P_{2}) = \frac{1}{|P_{1}|}\sum_{p \in P_{1}} \min_{p' \in P_{2}} ||p - p'||_{2}^2 + \frac{1}{|P_{2}|}\sum_{p' \in P_{2}} \min_{p \in P_{1}} ||p' - p||_{2}^2$$ -->
+For both denoising and point completion tasks, I chose the **Chamfer Distance** as the loss function, since point clouds are unordered sets, and typical reconstruction losses such as mean squared error (MSE) are not suitable. The loss function is defined as:
 
 <p align="center">
   <img src="docs/chamfer.png" alt="Image 1" width="57%" />
@@ -189,38 +184,40 @@ We can unify both tasks with a single loss function, namely, **Chamfer Distance*
 Note that I used the Euclidean distance formulation here (but $||\cdot||_{1}$ norm is sometimes used). Given two point clouds $P_1 \in \mathbb{R}^3$, $P_2 \in \mathbb{R}^3$, it essentially measures the distance between them. Specifically, for every point in $P_1$, it measures the distance between the nearest point in $P_2$, and vice versa. One thing to consider is that efficiently implementing this loss requires an efficient method of computing nearest neighbors (e.g. using K-D trees). In order to maximize efficiency (training speed), I've shamelessly decided to utilize NVIDIA's kaolin library, as their implementation uses special CUDA-related optimizations.
 
 #### **Training Objective**
-This is a supervised machine learning problem, where we have a training set $\mathcal{D}_{i}^{N} = \{(x_1, y_2),...,(x_N, y_N)\}$ with noisy/incomplete input point clouds and their corresponding original ground truth point clouds. In the denoising task, the inputs have the same number of points as the ouputs, i.e. $|x_i| = |y_i|$, whereas in the point completion task, the outputs have more points, i.e. $|x_i| < |y_i|$. Our training objective is to find the optimal set of parameters $\theta$ of our model that minimizes the expected loss over the entire dataset, namely:
+Both denoising and point completion are supervised learning tasks, where we have a labeled training set $\mathcal{D}_{i}^{N} = \{(x_1, y_2),...,(x_N, y_N)\}$ of pairs of noisy (or incomplete) and clean point clouds. The training objective is to find the optimal set of parameters $\theta$ for the model that minimizes the expected loss over the entire dataset, namely:
 
 $$\theta^* = \arg\min_{\theta}\sum_{i}^{N}L(x_i, y_i, \theta)$$
 
-where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is our denoising/point completion model.
+where $$L(x_i, y_i, \theta) = L_{CD}(f_\theta(x_i), y_i)$$ and $f_\theta$ is the `DenoiserTransformer`/`CompletionTransformer` model.
 
 #### **Experimental Setup**
-As mentioned in the data preparation section, I dynamically augmented the point clouds to ensure/mitigate the potential for the model to fit to certain noise patterns. I investigated two choices for both $\epsilon = 0.05, 0.075$ and $r=0.25, 0.5$:
+For `DenoiserTransformer` and `CompletionTransformer`, I investigated $\epsilon = 0.05, 0.075$ and $r=0.25, 0.50$, respectively. The table below summarizes the model training experiments that were ran:
 
-| Model  | noise strength (%) | points removed (%) |
-| :---------------- | :------: | :----: |
-| DenoiserTransformer     |   5.0   | 0     |
-| DenoiserTransformer   |       7.5   | 0   |
-| CompletionTransformer    |  0    | 25     |
-| CompletionTransformer   |  0    | 50   |
-    
+| Model               | noise strength (%) | points removed (%) | input dimension | output dimension | # parameters (MM) |
+| :------------------ | :----------------: | :----------------: | :-------------: | :--------------: | :--------------: |
+| DenoiserTransformer |        5.0         |         0         |      1024           |   1024               |   17.9               |
+| DenoiserTransformer |        7.5         |         0         |          1024       |   1024               |   17.9               |
+| CompletionTransformer |      0           |        25         |         768        |   1024               |   21.04               |
+| CompletionTransformer |      0           |        50         |     512            |    1024              |   21.83               |
 
-##### **Hyperparameters**
+#### **Hyperparameters**
 The hyperparameters for training the denoising models were chosen empirically based on initial training runs and GPU capacity. Note that they are fixed across all four experiments, due to simplicity and the time constraint for this assignment. However, in practice one should optimize the hyperparameters separately for each of these four models as the distribution of the training data will be slightly to significantly different based on how different or extreme the data augmentations are for each combination.
 
 * learning rate: $1e-4$
 * warmup ratio: $0.1$
-* batch size: $8$ x number of GPUs
-* max number of epochs: $300$
+* early stopping patience (in epochs): $10$
+* batch size: $16$ x number of GPUs
+* max number of epochs: $100$
+* number of dataloader processes/workers: $8$
 * max number of points per point cloud: $1024$
 * number of encoder/decoder layers: $8$
 * number of self-attention/cross-attention heads per layer: $8$
+* dropout: $0.1$
 * embedding & K, Q, V vector dimension: $256$
-* number of dataloader processes/workers: $8$
+* dataset ratio (portion of training set): $1$ 
 
 #### **Optimization**
-For optimization, I chose AdamW (with default parameters) as it's a powerful adaptive, momentum-based gradient descent optimization method that is typically very effective for training larger, transformer-based models. I also decided to use learning rate scheduling as it also (in my experience) improves training for transformer models. I used a linear schedule for the first 10% of training steps (10 epochs) to warmup the model and a cosine annealing schedule for the remanining 90% of training steps. I found that the warmups were essential for stable training in the initial stages, otherwise the models had trouble training/converging.
+For optimization, I chose AdamW (with default parameters) as it's a powerful adaptive, momentum-based gradient descent optimization method that is typically very effective for training larger, transformer-based models. I also decided to use learning rate scheduling as it also (in my experience) improves training stability for transformer models. I used a linear schedule for the first 10% of training steps (10 epochs) to warmup the model and a cosine annealing schedule for the remaining 90% of training steps (90 epochs). I found that the warmups were essential for stable training in the initial stages, otherwise the models had trouble learning at all.
 
 #### **Cross Validation**
 
