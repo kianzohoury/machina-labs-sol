@@ -197,7 +197,7 @@ The architecture for the point completion model `models.completion.CompletionTra
 The goal of the query generator module, is to generate an initial set of point embeddings given local/global features extracted by the encoder. Query embeddings are then passed through the decoder layers, along with the encoder features as the keys/values, and processed together via cross-attention. The idea here is to guide the decoder in translating these initial query embeddings into the correct points that complete the point cloud, by attending to the salient contextual features extracted by the encoder at each corresponding layer.
 
 <p align="center">
-  <img src="docs/completiontransformer.png" alt="Image 1" width="50%" />
+  <img src="docs/completiontransformer.png" alt="Image 1" width="57%" />
 </p>
 
 Note that the diagram is simplified, but each self-attention/cross-attention module follows the standard transformer recipe with multiple heads, residual layers, layer normalization, and feed-forward layers.
@@ -434,9 +434,12 @@ The following images were generated from the same hold-out test set by `Completi
 ## Part II: Generating Synthetic Defects with Diffusion Models
 For this section, I relied on a pre-trained conditional text-to-3D diffusion model, specifically [point-e](https://github.com/openai/point-e) by OpenAI. Since training from scratch is obviously costly and unfeasible, I opted for fine-tuning point-e on point clouds derived from ShapeNetCore.
 
-As mentioned in the problem understanding section, training a robust defect detection system requires having a rich and diverse distribution of defects, with potentially many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I constrained defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals corresponding to the point clouds. In theory, if we could model a certain defect as a series of functions/transformations applied to clean point clouds, we could easily fine-tune a diffusion model to generate these as well. The "realism" of the generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data.
+As mentioned in the problem understanding section, training a robust defect detection system requires having a rich and diverse distribution of defects, with potentially many examples per defect category, ideally across multiple types of part geometries. While in the context of metal forming/manufacturing, defects can manifest as wrinkling, cracks, warping, holes, etc., I limited the definition of defects to simply mean point cloud "deformities," such as noise and missing points. Initially, I tried to simulate structural defects like bumps/dents, but found it quite tricky to implement without using meshes/normals. In theory, if we can model a certain defect category using simulation software, for example, we can easily fine-tune a diffusion model to generate such defects. 
 
-For the fine-tuning task, I generated a distribution of training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore as before. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying noise or removing a region of points. The diffusion model's inputs were generated with simple text prompts with the following form: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
+For the fine-tuning task, I generated a distribution of initial training data, which consisted of input text prompts and defective point clouds (ground truth labels) sourced from point clouds from ShapeNetCore. Similar to the denoising/point completion tasks in Part I, I started with clean point clouds and applied defect transformations by either applying noise or removing a region of points. The diffusion model's inputs were generated with simple text prompts with the following form: `"<ShapeNet class> <defect type> defect"`. Below are examples from the resulting training set:
+
+<!-- The "realism" of these generated synthetic defective point clouds would be highly dependent on how well we can simulate defects (since training a generative model on unrealistic defects will give you just that) and how closely their characteristics match those found in real data. -->
+
 
 ### Defect Examples
 <p align="center">
@@ -493,7 +496,15 @@ python -m machina-labs-sol.point-e.text2ply_pointE --num_generate 5 --checkpoint
 ```
 which will load the specified model checkpoint, e.g. `removal_defect_diffusion.pth`, generate the specified number of defective points cloud (5 in this case), and save them to the output directory `machina-labs-sol/synthetic_data`. Note that I unfortunately had to remove the upsample model, which increases the density/quality of the point clouds (by approximately a factor of 4), since I could not download the necessary model checkpoint. Having that additional model would likely increase the fidelity a bit and in turn, realism of the defective point clouds as well. 
 
-### Visualizing/Assessing Realism of Synthetic Data
+### Assessing Realism of Synthetic Defects with a Detection Model
+To determine the "realism" of the synthetic point cloud defects, I decided to train a simple transformer-based detection model `models.detection.Detector` on the synthetic defect point clouds, which was tested on "real" defects, aka, point clouds sampled from the same distribution as the initial training set. The table summarizes the results:
+
+| Model    | Defect  | Accuracy (%)         |
+|----------|---------|--------------------|
+| Detector | Noise   | 92.31 |
+| Detector | Removal | 49.48 |
+
+
 Let's take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
 
 #### Synthetic "Removal/Incomplete" Defects
