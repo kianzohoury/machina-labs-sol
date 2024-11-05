@@ -4,10 +4,8 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 torch.backends.cudnn.benchmark = True
-
 
 class ResidualDownBlock(nn.Module):
     """Residual convolutional block for down-sampling + feature extraction."""
@@ -105,122 +103,5 @@ class DenoiserConv(nn.Module):
         dec_1 = self.up_conv_1(enc_3, skip_3)
         dec_2 = self.up_conv_2(dec_1, skip_2)
         dec_3 = self.up_conv_3(dec_2, skip_1)
-        offset = self.output_projection(dec_3.permute(0, 2, 1))
-        denoised_point_cloud = x + offset
-        return denoised_point_cloud
-
-
-# def knn(x, k):
-#     """Compute k-nearest neighbors for each point in the point cloud."""
-#     inner = -2 * torch.matmul(x.transpose(2, 1), x)
-#     xx = torch.sum(x**2, dim=1, keepdim=True)
-#     pairwise_distance = -xx - inner - xx.transpose(2, 1)
-#     idx = pairwise_distance.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
-#     return idx
-
-# def get_graph_feature(x, k=20, idx=None):
-#     """Construct graph features for EdgeConv operations."""
-#     batch_size, num_dims, num_points = x.size()
-#     if idx is None:
-#         idx = knn(x, k=k)  # (batch_size, num_points, k)
-#     device = x.device
-
-#     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
-#     idx = idx + idx_base
-#     idx = idx.view(-1)
-
-#     x = x.transpose(2, 1).contiguous()  # (batch_size * num_points, num_dims)
-#     feature = x.view(batch_size * num_points, -1)[idx, :]
-#     feature = feature.view(batch_size, num_points, k, num_dims)
-#     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
-
-#     feature = torch.cat((feature - x, x), dim=3).permute(0, 3, 1, 2).contiguous()
-#     return feature  # (batch_size, 2 * num_dims, num_points, k)
-
-# class DGCNNEncoder(nn.Module):
-#     """Encoder module using DGCNN architecture."""
-#     def __init__(self, k=20, emb_dims=1024):
-#         super(DGCNNEncoder, self).__init__()
-#         self.k = k
-
-#         self.conv1 = nn.Sequential(
-#             nn.Conv2d(6, 64, kernel_size=1, bias=False),
-#             nn.BatchNorm2d(64),
-#             nn.ReLU()
-#         )
-#         self.conv2 = nn.Sequential(
-#             nn.Conv2d(128, 64, kernel_size=1, bias=False),
-#             nn.BatchNorm2d(64),
-#             nn.ReLU()
-#         )
-#         self.conv3 = nn.Sequential(
-#             nn.Conv2d(128, 128, kernel_size=1, bias=False),
-#             nn.BatchNorm2d(128),
-#             nn.ReLU()
-#         )
-#         self.conv4 = nn.Sequential(
-#             nn.Conv2d(256, 256, kernel_size=1, bias=False),
-#             nn.BatchNorm2d(256),
-#             nn.ReLU()
-#         )
-#         self.conv5 = nn.Sequential(
-#             nn.Conv1d(512, emb_dims, kernel_size=1, bias=False),
-#             nn.BatchNorm1d(emb_dims),
-#             nn.ReLU()
-#         )
-
-#     def forward(self, x):
-#         batch_size, num_dims, num_points = x.size()
-
-#         x0 = get_graph_feature(x, k=self.k)
-#         x = self.conv1(x0)
-#         x1 = x.max(dim=-1)[0]
-
-#         x0 = get_graph_feature(x1, k=self.k)
-#         x = self.conv2(x0)
-#         x2 = x.max(dim=-1)[0]
-
-#         x0 = get_graph_feature(x2, k=self.k)
-#         x = self.conv3(x0)
-#         x3 = x.max(dim=-1)[0]
-
-#         x0 = get_graph_feature(x3, k=self.k)
-#         x = self.conv4(x0)
-#         x4 = x.max(dim=-1)[0]
-
-#         x = torch.cat((x1, x2, x3, x4), dim=1)
-#         x = self.conv5(x)
-#         x = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-#         return x
-
-# class DGCNNDecoder(nn.Module):
-#     """Decoder module to reconstruct the point cloud."""
-#     def __init__(self, emb_dims=1024, num_points=1024):
-#         super(DGCNNDecoder, self).__init__()
-#         self.num_points = num_points
-
-#         self.fc1 = nn.Linear(emb_dims, 1024)
-#         self.fc2 = nn.Linear(1024, 2048)
-#         self.fc3 = nn.Linear(2048, num_points * 3)
-
-#         self.bn1 = nn.BatchNorm1d(1024)
-#         self.bn2 = nn.BatchNorm1d(2048)
-
-#     def forward(self, x):
-#         x = F.relu(self.bn1(self.fc1(x)))
-#         x = F.relu(self.bn2(self.fc2(x)))
-#         x = self.fc3(x)
-#         x = x.view(-1, 3, self.num_points)
-#         return x
-
-# class DenoiserConv(nn.Module):
-#     """Autoencoder combining the encoder and decoder modules."""
-#     def __init__(self, num_points=1024, emb_dims=1024, k=20, **kwargs):
-#         super(DenoiserConv, self).__init__()
-#         self.encoder = DGCNNEncoder(k=k, emb_dims=emb_dims)
-#         self.decoder = DGCNNDecoder(emb_dims=emb_dims, num_points=num_points)
-
-#     def forward(self, x):
-#         x = self.encoder(x.permute(0, 2, 1))
-#         x = self.decoder(x).permute(0, 2, 1)
-#         return x
+        output = self.output_projection(dec_3.permute(0, 2, 1))
+        return output
