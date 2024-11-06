@@ -57,9 +57,10 @@
 - [Part II: Generating Synthetic Defects with Diffusion Models](#task-ii-generating-synthetic-defects-with-diffusion-models)
   - [Defect Examples](#defect-examples)
   - [Run Fine-tuning](#run-fine-tuning)
-  - [Download My Fine-tuned Models](#download-my-fine-tuned-models)
+  - [Download My Fine-tuned Diffusion Models](#download-my-fine-tuned-diffusion-models)
   - [Generating Synthetic Defective Point Clouds](#generating-synthetic-defective-point-clouds)
   - [Assessing Realism of Synthetic Defects with a Detection Model](#assessing-realism-of-synthetic-defects-with-a-detection-model)
+  - [Download My Defect Detection Models](#download-my-defect-detection-models)
   - [Visualizing Synthetic Defects](#visualizing-synthetic-defects)
     <!-- - [Synthetic "Removal/Incomplete" Defects](#synthetic-removalincomplete-defects)
     - [Synthetic "Noise" Defects](#synthetic-noise-defects) -->
@@ -483,7 +484,7 @@ Here, we're specifying fine-tuning for only one epoch, but we can train for more
 
 Model selection was carried out in the same fashion as Part I, where the best model was chosen based on its performance on a validation set.
 
-### Download My Fine-tuned Models
+### Download My Fine-tuned Diffusion Models
 To download the model checkpoints I trained previously, run the following commands:
 ```bash
 huggingface-cli download kianzohoury/shapenet_diffusion  --local-dir ./checkpoints
@@ -504,7 +505,14 @@ python train_detection.py --task completion --max_num_epochs 10
 ```
 which will train the detection model using synthetic defect and real nominal (non-defect) point clouds for the specified `--task`. I generated 200 synthetic point clouds (100 incomplete point clouds + 100 noisy point clouds), which equated to 100 synthetic defect + 100 real nominal training examples per detection model.
 
-The training and validation losses are shown below:
+### Download My Defect Detection Models
+Again, you can download the model checkpoints I trained previously, run the following commands:
+```bash
+huggingface-cli download kianzohoury/defect_detection  --local-dir ./checkpoints
+```
+which will save the checkpoints as `.pth` files in the `machina-labs-sol/checkpoints` directory.
+
+The training and validation losses for these models are shown below:
 
 <p align="center">
   <img src="docs/train_val_loss_detector_noise.png" alt="Image 1" width="80%" />
@@ -537,21 +545,31 @@ We see that synthetic noise defects are "realistic" because the detection model 
 Let's actually take a look at a few examples of synthetic defective point clouds generated from the fine-tuned diffusion models below:
 
 <p align="center">
+  <img src="docs/laptop_noise_synthetic.png" alt="Image 1" width="23%" />
+  <img src="docs/chair_noise_synthetic.png" alt="Image 2" width="23%" />
+  <img src="docs/table_noise_synthetic.png" alt="Image 3" width="25%" />
+</p>
+
+<p align="center">
+  <i> Synthetic point clouds with noise defects for a laptop (left), chair (middle) and table (right).</i>
+</p>
+
+It seems that noise defects are much easier to model and quite realistic, since the objects are easily recognizable. For example, the laptop and table still have sharp lines, but the chair is probably too noisy. I could've dialed down the noise level to maybe 2.5%, but I'm not sure what we gain from doing this (since we can just apply noise augmentations directly), besides the fact that we're proving diffusion models can conditionally generate this style of defect.
+
+<p align="center">
   <img src="docs/mug_removal_synthetic.png" alt="Image 1" width="23%" />
   <img src="docs/table_removal_synthetic_2.png" alt="Image 2" width="23%" />
   <img src="docs/chair_removal_synthetic_2.png" alt="Image 3" width="21%" />
 </p>
 
-We see that the first two point clouds for the chair and table are quite deformed, missing structural pieces, while the third point cloud of a laptop has more structural integrity, but is missing clusters of points on both of its flat surfaces. I believe additional fine-tuning is required to generate more realistic samples, but I did not run enough inference to conclusively say this model generates completely unrealistic incomplete point clouds. 
-
-#### Synthetic "Noise" Defects
 <p align="center">
-  <img src="docs/laptop_noise_synthetic.png" alt="Image 1" width="23%" />
-  <img src="docs/chair_noise_synthetic.png" alt="Image 2" width="23%" />
-  <img src="docs/table_noise_synthetic.png" alt="Image 3" width="25%" />
+  <i> Synthetic point clouds with removal defects for a mug (left), table (middle) and chair (right).</i>
 </p>
-Compared to the synthetic data with removal defects, the synthetic noisy samples are more coherent, interestingly enough. They are not as noisy as the original distribution the diffusion model was fine-tuned on, which again, is surprising, but perhaps not if you consider the "denoising" nature of diffusion models. Perhaps it's harder/takes longer to fine-tune the model to understand that noise is desired, in this case, and not noise that is removed from latent representations during the backward phase. Nevertheless, these examples are geometrically consistent but noisy enough to be somewhat realistic and possibly representative of real-world laser-scanned 3D data.
+
+Interestingly, even though the detection model performed poorly on real data when trained on synthetic removal defects, the point clouds do not look terrible. After all, they simply look like incomplete point clouds that would benefit from a point completion model. 
 
 ### Impact of Synthetic Data on Downstream Detection Models
-While I did not make it to this section, I would have certainly tried to optimize the diffusion model more, in order to generate higher quality synethic, defective points clouds, and evaluated the effects they had on downstream classification/detection models. I would have likely started with [PointNet](https://github.com/charlesq34/pointnet), which could've led to some interesting insights about the quality of the synthetic data. 
-For example, if the PointNet classifier failed to identify the correct classes corresponding to the synthetic data, I would try to understand why/how the classifier was struggling. Because the classifier is not explicitly trained on defective data, it is expected that it will be exhibit higher uncertainty with defective point clouds, which are technically out-of-distribution. However, high uncertainty could mean that the defects are too extreme/unrealistic for the classifier to recognize the object's class. So, in some sense, if the defects are truly realistic, they would easily "fool" or pass as genuine instances of certain classes, according to the classifier. Instead of a classifier, we could also use a typical anomaly detection model (e.g. an autoencoder). If the synthetic defective point clouds have a reconstruction error below the acceptable threshold, then in some sense, they are of the same distribution as the original/nominal point clouds.
+My goal with training a basic detection model on synthetic data, was to determine both the viability and realism of synthetically generated defect data, which could be measured by the detection model's performance. Because the underlying/initial training set we fed the diffusion model is known (augmented ShapeNetCore point clouds), we know that a poor performing detection model means that the synthetic data is not suitable for replacing real defect data. In other words, the distributions are too dissimilar and the model cannot generalize to unseen (real-world) defects with only synthetic training data. 
+
+We saw that noise defects can be easily modeled and generalize well to real, noisy point clouds derived from ShapeNetCore. However, the same cannot be said for synthetic removal defects, which means further fine-tuning is required to determine whether these defects can be modeled realistically; that is, whether they can be considered as real incomplete point clouds. In conclusion, the general idea for testing whether synthetic data captures realism, is by training models (e.g. detection models) on synthetic data and running inference on real data. Furthermore, this can be done in the reverse direction, where we train a model on real data and generalize to synthetic data; however, the whole point of generating synthetic data is to improve existing models that are data-hungry and would benefit from larger training sets with more diverse examples of specific defects and geometries, among other factors that could be controlled by a conditional generative model.
+
